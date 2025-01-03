@@ -1,118 +1,113 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import * as React from 'react';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import HomeScreen from './screens/Home';
+import ProfileScreen from './screens/Profile';
+import { useEffect } from 'react';
+import SplashScreen from 'react-native-splash-screen';
+import OnBoard1Screen from './screens/OnBoard1';
+import OnBoard2Screen from './screens/OnBoarding2';
+import { StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Feather from 'react-native-vector-icons/Feather';
+import ConsultationsScreen from './screens/Consultations';
+import SpecialityDetailsScreen from './screens/SpecialityDetails';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
+
+const App = () => {
+  useEffect(() => {
+    // Masquer l'écran de chargement Splash après 1.5 seconde
+    setTimeout(() => {
+      SplashScreen.hide();
+    }, 1500);
+  }, []);
+
+  function MyTabs() {
+    return (
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          animation:"fade",
+          tabBarIcon: ({ color }) => {
+            let iconName;
+
+            if (route.name === 'Accueil') {
+              iconName = 'home';
+            } else if (route.name === 'consultations') {
+              iconName = 'activity';
+            } else if (route.name === 'profile') {
+              iconName = 'user';
+            }
+
+            return (
+              <View style={styles.iconContainer}>
+                <Feather name={iconName} size={18} color={color} />
+              </View>
+            );
           },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
+          tabBarActiveTintColor: '#09d1a0',
+          tabBarInactiveTintColor: 'gray',
+          tabBarStyle: { backgroundColor: '#f9f9f9' },
+          tabBarHideOnKeyboard:true,
+          tabBarButton: (props) => (
+            <TouchableWithoutFeedback
+              onPress={props.onPress}
+              accessibilityRole="button"
+              accessible
+            >
+              <View style={{ flex: 1,justifyContent:'center',alignItems:'center' }}>{props.children}</View>
+            </TouchableWithoutFeedback>
+          ),
+          
+        })}
+        
+      >
+        <Tab.Screen  name="Accueil" component={HomeScreen} options={{ headerShown: false}} />
+        <Tab.Screen name="consultations" component={ConsultationsScreen} options={{headerShown: false}}/>
+        <Tab.Screen name="profile" component={ProfileScreen} options={{headerShown: false}}/>
+        </Tab.Navigator>
+    );
+  }
+  
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <NavigationContainer>
+      <Stack.Navigator
+      initialRouteName='onBoard1'>
+        <Stack.Screen
+          name="Home"
+          component={MyTabs}
+          options={{headerShown:false}}
+        />
+        <Stack.Screen name="onBoard1" component={OnBoard1Screen} options={{headerShown:false}} />
+        <Stack.Screen name="onBoard2" component={OnBoard2Screen} options={{headerShown:false}} />
+        {/* <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} /> */}
+
+      </Stack.Navigator>
+    </NavigationContainer>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  iconContainer: {
+    width: 40,   // Largeur pour l'icône
+    height: 40,  // Hauteur pour l'icône
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
+  shadow: {
+    shadowColor: '#0cc0df',
+    shadowOffset: {
+      width: 0,
+      height: 10
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+    elevation: 5
+  }
 });
 
 export default App;
