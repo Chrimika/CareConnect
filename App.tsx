@@ -84,7 +84,7 @@ const App = () => {
         />
         <Stack.Screen name="onBoard1" component={OnBoard1Screen} options={{headerShown:false}} />
         <Stack.Screen name="onBoard2" component={OnBoard2Screen} options={{headerShown:false}} />
-        {/* <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} /> */}
+        <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} />
 
       </Stack.Navigator>
     </NavigationContainer>
