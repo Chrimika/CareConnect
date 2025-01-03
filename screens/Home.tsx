@@ -1,74 +1,80 @@
 import React from 'react';
-import { View, Text, ImageBackground, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Specialites } from './../datas/specialities'; // Assurez-vous de remplacer par le chemin correct
 import { useNavigation } from '@react-navigation/native';
 
 export default function SpecialitiesScreen() {
   const navigation = useNavigation();
 
+  // Vérifie si l'image ou le nom est manquant, si oui, ne pas afficher l'élément
   const renderItem = ({ item }) => {
-    console.log(item.imageRepresentatif)
     if (!item.imageRepresentatif || !item.nom) {
-      return null; // S'assure que l'élément ne s'affiche pas si des informations essentielles sont manquantes.
+      return null; // Ignore les éléments invalides
     }
 
     return (
       <TouchableOpacity
-        style={[styles.block, { backgroundColor: item.couleur || '#ffffff'}]} // Ajout d'une valeur par défaut si la couleur est manquante
+        style={[styles.block, { backgroundColor: 'white', borderWidth: 0.7, borderColor:'gray' }]}
         onPress={() => navigation.navigate('speciality', { id: item.id, nom: item.nom })}
       >
-        <ImageBackground
-          source={require({item.imageRepresentatif})}
-          style={styles.imageBackground}
-        >
-          <Text style={styles.blockText}>{item.nom}</Text>
-        </ImageBackground>
+        <Image
+          source={{ uri: item.imageRepresentatif }}
+          resizeMode="contain"
+          style={styles.image}
+        />
+        <Text style={styles.blockText}>{item.nom}</Text>
       </TouchableOpacity>
     );
   };
 
   return (
-    <ImageBackground source={require('../assets/images/HomeBg.png')} style={styles.container}>
+    <View style={styles.container}>
+
       <FlatList
         data={Specialites}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id.toString()} // Assure une clé unique pour chaque élément
+        horizontal
+        showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        numColumns={2}
       />
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e7faf2',
+    backgroundColor: '#fff',
   },
   listContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
+    justifyContent: 'space-evenly', // Également espacé entre les items
     paddingVertical: 20,
   },
   block: {
-    flex: 1,
     margin: 8,
-    height: 150,
+    padding: 8,
+    height: 120,
+    width: 120,
     borderRadius: 10,
     overflow: 'hidden',
-  },
-  imageBackground: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  image: {
+    width: 80,
+    height: 80,
+    borderRadius: 40, // Rendre l'image circulaire
+    overflow: 'hidden',
+  },
   blockText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2, // Ajuste le padding pour le rendre plus adapté
-    borderRadius: 5,
-    width: '100%', // Pour s'assurer que le texte ne dépasse pas
+    marginTop: 8,
   },
 });
