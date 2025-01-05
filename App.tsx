@@ -12,6 +12,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Feather from 'react-native-vector-icons/Feather';
 import ConsultationsScreen from './screens/Consultations';
 import SpecialityDetailsScreen from './screens/SpecialityDetails';
+import LoginScreen from './screens/Login';
+import SignInScreen from './screens/SignIn';
 
 
 const Stack = createNativeStackNavigator();
@@ -85,7 +87,8 @@ const App = () => {
         <Stack.Screen name="onBoard1" component={OnBoard1Screen} options={{headerShown:false}} />
         <Stack.Screen name="onBoard2" component={OnBoard2Screen} options={{headerShown:false}} />
         <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} />
-
+        <Stack.Screen name="login" component={LoginScreen} options={{headerShown:false}} />
+        <Stack.Screen name="signin" component={SignInScreen} options={{headerShown:false}} />
       </Stack.Navigator>
     </NavigationContainer>
   );
