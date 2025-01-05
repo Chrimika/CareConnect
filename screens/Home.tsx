@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ImageBackground, StatusBar } from 'react-native';
 import { Specialites } from './../datas/specialities'; // Assurez-vous de remplacer par le chemin correct
 import { useNavigation } from '@react-navigation/native';
-
+import Feather from 'react-native-vector-icons/Feather'
 export default function SpecialitiesScreen() {
   const navigation = useNavigation();
 
@@ -15,7 +15,7 @@ export default function SpecialitiesScreen() {
     return (
       <TouchableOpacity
         style={[styles.block, { backgroundColor: 'white', borderWidth: 0.7, borderColor:'gray' }]}
-        onPress={() => navigation.navigate('speciality', { id: item.id, nom: item.nom })}
+        onPress={() => navigation.navigate('speciality', { id: item.id, nom: item.nom, imageRepresentatif:item.imageRepresentatif })}
       >
         <Image
           source={{ uri: item.imageRepresentatif }}
@@ -29,7 +29,30 @@ export default function SpecialitiesScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor="#0bcb95" barStyle="light-content" />
+      <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.4}}>
+        <View style={{padding:16,justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95'}}>
+          <View>
+            <Image source={require('../assets/images/logo.png')} style={{width:40,height:40}}/>
+          </View>
+          <View>
+            <Feather name='bell' size={22} color={'white'}/>
+          </View>
+        </View>
+        <View style={{paddingHorizontal:16,}}>
+          <Text style={{fontSize:20,fontFamily:'Rubik Medium',color:'white'}}>Hosto au piol</Text>
+          <Text style={{fontWeight:'ultralight',fontSize:12,color:'white'}}>
+          Consultez un médecin ou accédez aux soins facilement, où que vous soyez !
+          </Text>
+        </View>
+      </ImageBackground>
+      <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center'}}>
+        <View style={{backgroundColor:'#0bcb95',width:5,height:20}}>
 
+        </View>
+        <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Specialités</Text>
+      </View>
+      <View style={{flex:0.25,justifyContent:'center',alignItems:'center'}}>
       <FlatList
         data={Specialites}
         renderItem={renderItem}
@@ -37,7 +60,16 @@ export default function SpecialitiesScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        style={{}}
       />
+      </View>
+      <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center',marginTop:16}}>
+        <View style={{backgroundColor:'#0bcb95',width:5,height:20}}>
+
+        </View>
+        <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Services</Text>
+      </View>
+    
     </View>
   );
 }
@@ -49,13 +81,12 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     justifyContent: 'space-evenly', // Également espacé entre les items
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   block: {
-    margin: 8,
+    marginHorizontal: 8,
     padding: 8,
     height: 120,
     width: 120,

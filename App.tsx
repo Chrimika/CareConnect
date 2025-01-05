@@ -50,8 +50,8 @@ const App = () => {
             );
           },
           tabBarActiveTintColor: '#09d1a0',
-          tabBarInactiveTintColor: 'gray',
-          tabBarStyle: { backgroundColor: '#f9f9f9' },
+          tabBarInactiveTintColor: '#000',
+          tabBarStyle: { backgroundColor: '#fff',borderColor:"#fff" },
           tabBarHideOnKeyboard:true,
           tabBarButton: (props) => (
             <TouchableWithoutFeedback
