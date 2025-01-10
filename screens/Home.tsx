@@ -33,7 +33,7 @@ export default function SpecialitiesScreen() {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#0bcb95" barStyle="light-content" />
-      <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.4}}>
+      <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.35}}>
         <View style={{padding:16,justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95'}}>
           <View>
             <Image source={require('../assets/images/logo.png')} style={{width:40,height:40}}/>
@@ -49,13 +49,14 @@ export default function SpecialitiesScreen() {
           </Text>
         </View>
       </ImageBackground>
+      <View style={{flex:0.3}}>
       <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center'}}>
         <View style={{backgroundColor:'#0bcb95',width:5,height:20}}>
 
         </View>
         <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Specialités</Text>
       </View>
-      <View style={{flex:0.25,justifyContent:'center',alignItems:'center'}}>
+      <View style={{justifyContent:'center',alignItems:'center'}}>
       <FlatList
         data={Specialites}
         renderItem={renderItem}
@@ -66,11 +67,27 @@ export default function SpecialitiesScreen() {
         style={{}}
       />
       </View>
-      <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center',marginTop:16}}>
+      </View>
+      <View style={{flex:0.3}}>
+      <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center'}}>
         <View style={{backgroundColor:'#0bcb95',width:5,height:20}}>
 
         </View>
-        <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Services</Text>
+        <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Généraliste</Text>
+      </View>
+      <View style={{flex:1,flexDirection:'row'}}>
+        <ImageBackground resizeMode='contain' source={require('../assets/images/doctorHero.png')} style={{flex:0.6}}>
+          
+        </ImageBackground>
+        <View style={{flex:0.4,paddingHorizontal:15,justifyContent:'center'}}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('onBoard2')}
+          style={{ backgroundColor: '#0bcb95', width: '100%', padding: 10, borderRadius: 15 }}
+        >
+          <Text style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff',fontFamily:'Poppins Medium' }}>Consulter</Text>
+        </TouchableOpacity>
+        </View>
+      </View>
       </View>
     
     </View>
