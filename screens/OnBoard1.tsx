@@ -1,7 +1,9 @@
 import { View, Text, Image, TouchableOpacity, ImageBackground } from 'react-native';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import Toast from 'react-native-root-toast';
+import NetInfo from '@react-native-community/netinfo';
 
 // Définissez vos types de navigation
 type RootStackParamList = {
@@ -20,6 +22,32 @@ interface Props {
 }
 
 export default function OnBoard1Screen({ navigation }: Props) {
+  
+  const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    // Écoute les changements de connexion réseau
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+      
+      if (!state.isConnected) {
+        Toast.show('Bienvenu, Connectez vous a internet svp.', {
+          duration: Toast.durations.LONG, // Durée : court
+          position: Toast.positions.TOP,   // Position : haut de l'écran
+          shadow: false,                   // Désactive l'ombre
+          animation: true,                 // Ajoute une animation
+          backgroundColor: '#ffffff',      // Teint clair (fond blanc)
+          textColor: '#000000',            // Couleur du texte : noir
+          opacity: 0.9,                    // Transparence
+          hideOnPress: true,               // Cacher au toucher
+        });
+      }
+    });
+
+    // Nettoyage de l'abonnement
+    return () => unsubscribe();
+  }, []);
+
   return (
     <ImageBackground source={require('../assets/images/bgOnBoard.png')} style={{ height: '100%' }}>
       <ImageBackground source={require('../assets/images/pic1.jpg')} style={{ justifyContent: 'center', paddingVertical: 15, height: '100%', flex: 5,alignItems:'center'}}>

@@ -22,12 +22,14 @@ const Tab = createBottomTabNavigator();
 
 
 const App = () => {
+
   useEffect(() => {
     // Masquer l'écran de chargement Splash après 1.5 seconde
     setTimeout(() => {
       SplashScreen.hide();
     }, 1500);
   }, []);
+  
 
   function MyTabs() {
     return (
@@ -78,7 +80,7 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-      initialRouteName='onBoard1'>
+      initialRouteName='Home'>
         <Stack.Screen
           name="Home"
           component={MyTabs}

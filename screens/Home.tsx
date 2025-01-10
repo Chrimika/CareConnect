@@ -3,6 +3,9 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, ImageBackgro
 import { Specialites } from './../datas/specialities'; // Assurez-vous de remplacer par le chemin correct
 import { useNavigation } from '@react-navigation/native';
 import Feather from 'react-native-vector-icons/Feather'
+
+
+
 export default function SpecialitiesScreen() {
   const navigation = useNavigation();
 
@@ -15,7 +18,7 @@ export default function SpecialitiesScreen() {
     return (
       <TouchableOpacity
         style={[styles.block, { backgroundColor: 'white', borderWidth: 0.7, borderColor:'gray' }]}
-        onPress={() => navigation.navigate('speciality', { id: item.id, nom: item.nom, imageRepresentatif:item.imageRepresentatif })}
+        onPress={() => navigation.navigate('speciality', { item })}
       >
         <Image
           source={{ uri: item.imageRepresentatif }}
