@@ -12,6 +12,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Feather from 'react-native-vector-icons/Feather';
 import ConsultationsScreen from './screens/Consultations';
 import SpecialityDetailsScreen from './screens/SpecialityDetails';
+import LoginScreen from './screens/Login';
+import SignInScreen from './screens/SignIn';
 
 
 const Stack = createNativeStackNavigator();
@@ -20,12 +22,14 @@ const Tab = createBottomTabNavigator();
 
 
 const App = () => {
+
   useEffect(() => {
     // Masquer l'écran de chargement Splash après 1.5 seconde
     setTimeout(() => {
       SplashScreen.hide();
     }, 1500);
   }, []);
+  
 
   function MyTabs() {
     return (
@@ -50,8 +54,8 @@ const App = () => {
             );
           },
           tabBarActiveTintColor: '#09d1a0',
-          tabBarInactiveTintColor: 'gray',
-          tabBarStyle: { backgroundColor: '#f9f9f9' },
+          tabBarInactiveTintColor: '#000',
+          tabBarStyle: { backgroundColor: '#fff',borderColor:"#fff" },
           tabBarHideOnKeyboard:true,
           tabBarButton: (props) => (
             <TouchableWithoutFeedback
@@ -76,7 +80,7 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-      initialRouteName='onBoard1'>
+      initialRouteName='Home'>
         <Stack.Screen
           name="Home"
           component={MyTabs}
@@ -85,7 +89,8 @@ const App = () => {
         <Stack.Screen name="onBoard1" component={OnBoard1Screen} options={{headerShown:false}} />
         <Stack.Screen name="onBoard2" component={OnBoard2Screen} options={{headerShown:false}} />
         <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} />
-
+        <Stack.Screen name="login" component={LoginScreen} options={{headerShown:false}} />
+        <Stack.Screen name="signin" component={SignInScreen} options={{headerShown:false}} />
       </Stack.Navigator>
     </NavigationContainer>
   );
