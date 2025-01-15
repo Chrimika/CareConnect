@@ -81,7 +81,7 @@ export default function SpecialitiesScreen() {
         </ImageBackground>
         <View style={{flex:0.4,paddingHorizontal:15,justifyContent:'center'}}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('onBoard2')}
+          onPress={() => navigation.navigate('consultations')}
           style={{ backgroundColor: '#0bcb95', width: '100%', padding: 10, borderRadius: 15 }}
         >
           <Text style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff',fontFamily:'Poppins Medium' }}>Consulter</Text>
