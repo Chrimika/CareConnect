@@ -92,7 +92,7 @@ export default function LoginScreen({navigation}) {
                 fontFamily: 'Rubik Medium',
                 }}
             >
-                Pas encore de compte ?{' '}
+                Deja un compte ?{' '}
             </Text>
             <TouchableOpacity onPress={() => navigation.navigate('signin')}>
                 <Text
@@ -104,7 +104,7 @@ export default function LoginScreen({navigation}) {
                     textDecorationLine:'underline'
                 }}
                 >
-                Sign up
+                Se Connecter
                 </Text>
             </TouchableOpacity>
             </View>

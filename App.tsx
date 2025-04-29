@@ -14,6 +14,7 @@ import ConsultationsScreen from './screens/Consultations';
 import SpecialityDetailsScreen from './screens/SpecialityDetails';
 import LoginScreen from './screens/Login';
 import SignInScreen from './screens/SignIn';
+import MessagesScreen from './screens/Messages';
 
 
 const Stack = createNativeStackNavigator();
@@ -45,7 +46,10 @@ const App = () => {
               iconName = 'activity';
             } else if (route.name === 'profile') {
               iconName = 'user';
+            } else if (route.name === 'message') {
+              iconName = 'mail';
             }
+            
 
             return (
               <View style={styles.iconContainer}>
@@ -72,6 +76,7 @@ const App = () => {
       >
         <Tab.Screen  name="Accueil" component={HomeScreen} options={{ headerShown: false}} />
         <Tab.Screen name="consultations" component={ConsultationsScreen} options={{headerShown: false}}/>
+        <Tab.Screen name="message" component={MessagesScreen} options={{headerShown: false}}/>
         <Tab.Screen name="profile" component={ProfileScreen} options={{headerShown: false}}/>
         </Tab.Navigator>
     );
@@ -80,7 +85,7 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-      initialRouteName='Home'>
+      initialRouteName='login'>
         <Stack.Screen
           name="Home"
           component={MyTabs}
