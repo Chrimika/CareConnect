@@ -1,292 +1,70 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  SafeAreaView, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Dimensions, 
-  TouchableWithoutFeedback,
-  FlatList, 
-  Alert
-} from 'react-native';
-import moment from 'moment';
-import 'moment/locale/fr';
-import Swiper from 'react-native-swiper';
-import Consultation from '../controller/Consultation';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Alert } from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth'; // Importer Firebase Auth pour récupérer l'ID utilisateur
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-moment.locale('fr');
-const { width } = Dimensions.get('screen');
-
-export default function ConsultationsScreen() {
-  const swiper = useRef<Swiper>(null);
-  const [value, setValue] = useState(new Date());
-  const [week, setWeek] = useState(0);
-  const [selectedHour, setSelectedHour] = useState<string | null>(null);
-
-  const hours = useMemo(() => {
-    // Générer des heures de 00:00 à 23:30 par incréments de 30 minutes
-    return Array.from({ length: 48 }, (_, index) => {
-      return moment().startOf('day').add(index * 30, 'minutes').format('HH:mm');
-    });
-  }, []);
-
-  const weeks = useMemo(() => {
-    const start = moment().add(week, 'weeks').startOf('week');
-    return [-1, 0, 1].map((adj) => {
-      return Array.from({ length: 7 }).map((_, index) => {
-        const date = moment(start).add(adj, 'week').add(index, 'day');
-        return {
-          weekday: date.format('ddd').replace('.', ''),
-          date: date.toDate(),
-        };
-      });
-    });
-  }, [week]);
-
-  const handleConfirmAppointment = () => {
-    if (selectedHour) {
-      const consultation = new Consultation(
-        value,
-        selectedHour,
-        'Doe',
-        'John',
-        'Générale'
-      );
-      Alert.alert('Rendez-vous confirmé', consultation.getDetails());
-    } else {
-      Alert.alert('Veuillez sélectionner une heure.');
+const ConsultationScreen = () => {
+  const [position, setPosition] = useState(null);
+  
+  // Fonction pour obtenir la position de l'utilisateur
+  const getPosition = async () => {
+    const user = auth().currentUser; // Récupérer l'utilisateur connecté
+    if (!user) {
+      Alert.alert('Erreur', 'Utilisateur non connecté');
+      return;
     }
+
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        // Mettre à jour l'état local avec la nouvelle position
+        setPosition({ latitude, longitude });
+
+        // Sauvegarder la position localement avec AsyncStorage
+        await AsyncStorage.setItem('userPosition', JSON.stringify({ latitude, longitude }));
+
+        // Mettre à jour la position dans Firestore
+        await firestore().collection('users').doc(user.uid).update({
+          position: new firestore.GeoPoint(latitude, longitude),
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+        });
+      },
+      (error) => {
+        console.warn(error);
+        Alert.alert('Erreur', 'Impossible d\'obtenir la position de l\'utilisateur.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
   };
 
+  // Mettre à jour la position toutes les 30 secondes
+  useEffect(() => {
+    getPosition(); // Appeler immédiatement pour obtenir la première position
+
+    const interval = setInterval(() => {
+      getPosition();
+    }, 30000); // Toutes les 30 secondes
+
+    return () => clearInterval(interval); // Nettoyer l'intervalle quand le composant est démonté
+  }, []);
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Vos disponibilités</Text>
-        </View>
-        <View style={styles.picker}>
-          <Swiper
-            index={1}
-            ref={swiper}
-            showsPagination={false}
-            loop={false}
-            onIndexChanged={(ind) => {
-              if (ind === 1) {
-                return;
-              }
-              setTimeout(() => {
-                const newIndex = ind - 1;
-                const newWeek = week + newIndex;
-                setWeek(newWeek);
-                setValue(moment(value).add(newIndex, 'week').toDate());
-
-                if (swiper.current) {
-                  swiper.current.scrollTo(1, false);
-                }
-              }, 100);
-            }}
-          >
-            {weeks.map((dates, weekIndex) => (
-              <View
-                style={[styles.itemRow, { paddingHorizontal: 16 }]}
-                key={`week-${weekIndex}`}
-              >
-                {dates.map((item, dateIndex) => {
-                  const isActive = value.toDateString() === item.date.toDateString();
-
-                  return (
-                    <TouchableWithoutFeedback
-                      key={dateIndex}
-                      onPress={() => setValue(item.date)}
-                    >
-                      <View
-                        style={[
-                          styles.item,
-                          isActive && {
-                            backgroundColor: '#0bcb95',
-                            borderColor: '#0bcb95',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.itemWeekday,
-                            isActive && {
-                              color: '#fff',
-                            },
-                          ]}
-                        >
-                          {item.weekday}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.itemDate,
-                            isActive && {
-                              color: '#fff',
-                            },
-                          ]}
-                        >
-                          {item.date.getDate()}
-                        </Text>
-                      </View>
-                    </TouchableWithoutFeedback>
-                  );
-                })}
-              </View>
-            ))}
-          </Swiper>
-        </View>
-        <View style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 24 }}>
-          <View style={styles.hourPicker}>
-            <Text style={styles.subTitle}>Choisissez une heure</Text>
-            <FlatList
-              horizontal
-              data={hours}
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 16 }}
-              keyExtractor={(item, index) => index.toString()}
-              renderItem={({ item }) => {
-                const isSelected = item === selectedHour;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.hourItem,
-                      isSelected && {
-                        backgroundColor: '#0bcb95',
-                        borderColor: '#0bcb95',
-                      },
-                    ]}
-                    onPress={() => setSelectedHour(item)}
-                  >
-                    <Text
-                      style={[
-                        styles.hourText,
-                        isSelected && {
-                          color: '#fff',
-                        },
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-            <Text style={styles.contentText}>
-              {moment(value).format('dddd D MMMM YYYY')} à {selectedHour}Hr
-            </Text>
-          </View>
-          <View style={{flex:1}}></View>
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.btn} onPress={handleConfirmAppointment}>
-              <Text style={styles.btnText}>Prendre rendez-vous</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </SafeAreaView>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Position actuelle de l'utilisateur :</Text>
+      {position ? (
+        <Text>Latitude: {position.latitude} / Longitude: {position.longitude}</Text>
+      ) : (
+        <Text>Chargement de la position...</Text>
+      )}
+    </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: 24,
-  },
-  header: {
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1d1d1d',
-    marginBottom: 12,
-  },
-  contentText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#0bcb95',
-    marginBottom: 12,
-  },
-  picker: {
-    flex: 1,
-    maxHeight: 74,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemRow: {
-    width,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginHorizontal: -4,
-  },
-  item: {
-    flex: 1,
-    height: 50,
-    marginHorizontal: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#fff',
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'column',
-    backgroundColor: '#fff',
-  },
-  itemWeekday: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#737373',
-    marginBottom: 4,
-  },
-  itemDate: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
-  },
-  hourPicker: {
-    marginBottom: 16,
-  },
-  subTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  hourItem: {
-    padding: 12,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hourText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  footer: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  btn: {
-    flexDirection: 'row',
-    backgroundColor: '#0bcb95',
-    borderWidth: 1,
-    borderColor: '#0bcb95',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-  },
-});
+export default ConsultationScreen;

@@ -85,7 +85,7 @@ const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-      initialRouteName='login'>
+      initialRouteName='onBoard1'>
         <Stack.Screen
           name="Home"
           component={MyTabs}
