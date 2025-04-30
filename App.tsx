@@ -13,7 +13,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import ConsultationsScreen from './screens/Consultations';
 import SpecialityDetailsScreen from './screens/SpecialityDetails';
 import LoginScreen from './screens/Login';
-import SignInScreen from './screens/SignIn';
+import SignUpScreen from './screens/SignUp';
 import MessagesScreen from './screens/Messages';
 
 
@@ -95,7 +95,7 @@ const App = () => {
         <Stack.Screen name="onBoard2" component={OnBoard2Screen} options={{headerShown:false}} />
         <Stack.Screen name="speciality" component={SpecialityDetailsScreen} options={{headerShown:false}} />
         <Stack.Screen name="login" component={LoginScreen} options={{headerShown:false}} />
-        <Stack.Screen name="signin" component={SignInScreen} options={{headerShown:false}} />
+        <Stack.Screen name="signup" component={SignUpScreen} options={{headerShown:false}} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -135,7 +135,7 @@ import {
   
               <View style={{ width: '100%', flex: 0.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
                 <Text style={{ color: 'black', fontSize: 14, fontFamily: 'Rubik Medium' }}>Pas encore de compte ? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('signin')}>
+                <TouchableOpacity onPress={() => navigation.navigate('signup')}>
                   <Text style={{ color: '#0bcb95', fontSize: 14, fontFamily: 'Rubik Medium', textDecorationLine: 'underline' }}>S'inscrire</Text>
                 </TouchableOpacity>
               </View>
