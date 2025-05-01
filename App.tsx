@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import SplashScreen from 'react-native-splash-screen';
 import OnBoard1Screen from './screens/OnBoard1';
 import OnBoard2Screen from './screens/OnBoarding2';
-import { StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
+import { StatusBar, StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Feather from 'react-native-vector-icons/Feather';
 import ConsultationsScreen from './screens/Consultations';
@@ -84,6 +84,7 @@ const App = () => {
   
   return (
     <NavigationContainer>
+      <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />
       <Stack.Navigator
       initialRouteName='onBoard1'>
         <Stack.Screen

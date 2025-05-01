@@ -11,25 +11,104 @@ Mapbox.setAccessToken("pk.eyJ1Ijoiam9yZWwtdGlvbWVsYSIsImEiOiJjbTdxbjhpNHgxMnFwMm
 const hospitals = [
   {
     id: '1',
-    name: 'Clinique Saint-Luc',
-    latitude: 5.3489,
-    longitude: -3.9894,
-    price: 5000,
-    rating: 4.5,
-    comments: ['Service rapide', 'Médecin à l’écoute'],
-    openingHours: { start: 8, end: 18 } // en heures
+    name: 'Hôpital Central de Yaoundé',
+    latitude: 3.8686,
+    longitude: 11.5214,
+    price: 4500,
+    rating: 4.3,
+    comments: ['Service efficace', 'Personnel compétent'],
+    openingHours: { start: 7, end: 20 }
   },
   {
     id: '2',
-    name: 'Hôpital Général de Cocody',
-    latitude: 5.3550,
-    longitude: -3.9900,
-    price: 3000,
-    rating: 4.2,
-    comments: ['Un peu d’attente', 'Bon équipement'],
-    openingHours: { start: 7, end: 17 }
+    name: 'Clinique de la Cité Verte',
+    latitude: 3.8750,
+    longitude: 11.5030,
+    price: 6000,
+    rating: 4.6,
+    comments: ['Environnement moderne', 'Bon suivi médical'],
+    openingHours: { start: 8, end: 18 }
   },
-  // Ajoute-en d'autres si tu veux
+  {
+    id: '3',
+    name: 'Hôpital Général de Yaoundé',
+    latitude: 3.8622,
+    longitude: 11.5136,
+    price: 3500,
+    rating: 4.0,
+    comments: ['Affluence moyenne', 'Prix abordables'],
+    openingHours: { start: 6, end: 22 }
+  },
+  {
+    id: '4',
+    name: 'Polyclinique d\'Essos',
+    latitude: 3.8915,
+    longitude: 11.5310,
+    price: 5500,
+    rating: 4.4,
+    comments: ['Spécialistes qualifiés', 'Bon accueil'],
+    openingHours: { start: 7, end: 19 }
+  },
+  {
+    id: '5',
+    name: 'Clinique des Champions',
+    latitude: 3.8800,
+    longitude: 11.5150,
+    price: 7000,
+    rating: 4.7,
+    comments: ['Équipements high-tech', 'Service VIP'],
+    openingHours: { start: 6, end: 21 }
+  },
+  {
+    id: '6',
+    name: 'Hôpital de la Croix Bleue',
+    latitude: 3.8550,
+    longitude: 11.4950,
+    price: 4000,
+    rating: 4.1,
+    comments: ['Tradition de qualité', 'Urgences 24/24'],
+    openingHours: { start: 0, end: 24 }
+  },
+  {
+    id: '7',
+    name: 'Centre Médical de Ngoa-Ekelle',
+    latitude: 3.8660,
+    longitude: 11.5400,
+    price: 5000,
+    rating: 4.2,
+    comments: ['Propreté exemplaire', 'Bon rapport qualité-prix'],
+    openingHours: { start: 8, end: 17 }
+  },
+  {
+    id: '8',
+    name: 'Clinique du Mont Fébé',
+    latitude: 3.9000,
+    longitude: 11.5200,
+    price: 6500,
+    rating: 4.5,
+    comments: ['Vue panoramique', 'Calme et sérénité'],
+    openingHours: { start: 7, end: 19 }
+  },
+  {
+    id: '9',
+    name: 'Hôpital de la Mfoundi',
+    latitude: 3.8555,
+    longitude: 11.5255,
+    price: 3000,
+    rating: 3.9,
+    comments: ['Service public', 'Longues attentes'],
+    openingHours: { start: 6, end: 18 }
+  },
+  {
+    id: '10',
+    name: 'Centre Hospitalier de Bastos',
+    latitude: 3.8805,
+    longitude: 11.5055,
+    price: 8000,
+    rating: 4.8,
+    comments: ['Standards internationaux', 'Médecins expatriés'],
+    openingHours: { start: 6, end: 22 }
+  }
 ];
 
 

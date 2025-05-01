@@ -99,7 +99,8 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#0bcb95" barStyle="light-content" />
+      <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />
+      
       <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.35}}>
         <View style={{padding:16, justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95'}}>
           <TouchableOpacity onPress={()=>({})}>
@@ -117,7 +118,7 @@ export default function HomeScreen() {
         </View>
       </ImageBackground>
       <View style={{flex:0.3}}>
-        <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center'}}>
+        <View style={{flexDirection:'row',paddingHorizontal:16,alignItems:'center',marginTop:-15}}>
           <View style={{backgroundColor:'#0bcb95',width:5,height:20}}></View>
           <Text style={{marginLeft:6,fontFamily:'Poppins Light',fontSize:18,fontWeight:"600",color:'#000'}}>Specialités</Text>
         </View>

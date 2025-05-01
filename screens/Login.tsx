@@ -89,8 +89,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#087a5d" barStyle="light-content" />
-      
+      <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />      
       <View style={styles.header}>
         <Image 
           source={require('../assets/images/logo.png')} 

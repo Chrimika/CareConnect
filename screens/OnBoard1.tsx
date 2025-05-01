@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ImageBackground, StatusBar } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -62,6 +62,8 @@ export default function OnBoard1Screen({ navigation }: Props) {
 
   return (
     <ImageBackground source={require('../assets/images/bgOnBoard.png')} style={{ height: '100%' }}>
+      <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />
+      
       <ImageBackground source={require('../assets/images/pic1.jpg')} style={{ justifyContent: 'center', paddingVertical: 15, height: '100%', flex: 5, alignItems: 'center' }}>
       </ImageBackground>
       <View style={{ justifyContent: 'center', borderColor: 'black', width: '100%', padding: 20 }}>

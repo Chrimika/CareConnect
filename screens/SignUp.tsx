@@ -67,7 +67,7 @@ export default function SignUpScreen({ navigation }) {
 
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <StatusBar backgroundColor="#087a5d" barStyle="light-content" />
+      <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />
       <View style={{ flex: 1, backgroundColor: '#087a5d', width: '100%' }}>
         <View style={{ flex: 0.11, justifyContent: 'center', alignItems: 'center' }}>
           <Image resizeMode="contain" style={{ width: 48, height: 48, borderRadius: 24 }} source={require('../assets/images/logo.png')} />
