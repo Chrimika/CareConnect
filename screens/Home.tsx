@@ -102,12 +102,12 @@ export default function HomeScreen() {
       <StatusBar backgroundColor="#0bcb95" barStyle="light-content" />
       <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.35}}>
         <View style={{padding:16, justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95'}}>
-          <View>
+          <TouchableOpacity onPress={()=>({})}>
             <Image source={require('../assets/images/logo.png')} style={{width:40,height:40}}/>
-          </View>
-          <View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={()=>navigation.navigate('message')}>
             <Feather name='bell' size={22} color={'white'}/>
-          </View>
+          </TouchableOpacity>
         </View>
         <View style={{paddingHorizontal:16,}}>
           <Text style={{fontSize:20,fontFamily:'Rubik Medium',color:'white'}}>Hosto au piol</Text>

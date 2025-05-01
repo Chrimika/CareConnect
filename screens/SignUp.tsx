@@ -11,10 +11,8 @@ import {
 import React, { useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CryptoJS from 'crypto-js'; // Import de CryptoJS
-
-const SECRET_KEY = 'votre_clef_secrete_ici'; // Changez ceci par une clé forte et gardez-la secrète
 
 export default function SignUpScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -33,36 +31,35 @@ export default function SignUpScreen({ navigation }) {
     setLoading(true);
 
     try {
-      const snapshot = await firestore()
+      // Créer l'utilisateur avec Firebase Auth
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      
+      // Stocker les infos supplémentaires dans Firestore
+      await firestore()
         .collection('users')
-        .where('email', '==', email.trim().toLowerCase())
-        .get();
+        .doc(userCredential.user.uid)
+        .set({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim().toLowerCase(),
+          createdAt: firestore.FieldValue.serverTimestamp()
+        });
 
-      if (!snapshot.empty) {
-        Alert.alert('Erreur', 'Un compte avec cet email existe déjà.');
-        setLoading(false);
-        return;
-      }
-
-      // Chiffrer le mot de passe
-      const encryptedPassword = CryptoJS.AES.encrypt(password, SECRET_KEY).toString();
-
-      const userData = {
+      // Stocker les données minimales en local
+      await AsyncStorage.setItem('user', JSON.stringify({
+        uid: userCredential.user.uid,
         name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim().toLowerCase(),
-        password: encryptedPassword,
-        createdAt: firestore.FieldValue.serverTimestamp()
-      };
-
-      const docRef = await firestore().collection('users').add(userData);
-
-      await AsyncStorage.setItem('user', JSON.stringify({ ...userData, id: docRef.id }));
+        email: email.trim().toLowerCase()
+      }));
 
       navigation.replace('Home');
     } catch (error) {
       console.error(error);
-      Alert.alert('Erreur', "Une erreur est survenue lors de l'inscription.");
+      let errorMessage = "Une erreur est survenue lors de l'inscription.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'Un compte avec cet email existe déjà.';
+      }
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -84,7 +81,7 @@ export default function SignUpScreen({ navigation }) {
           </View>
           <View style={{ flex: 1, backgroundColor: '#ffffff', padding: 32, alignItems: 'center', borderTopLeftRadius: 37, borderTopRightRadius: 37 }}>
 
-            {/* Nom complet */}
+            {/* Champs du formulaire */}
             <View style={{ marginBottom: 24, width: '100%' }}>
               <Text style={{ fontSize: 12, color: 'black', fontFamily: 'Poppins Medium', marginBottom: 8 }}>Nom complet</Text>
               <TextInput
@@ -95,7 +92,6 @@ export default function SignUpScreen({ navigation }) {
               />
             </View>
 
-            {/* Numéro de téléphone */}
             <View style={{ marginBottom: 24, width: '100%' }}>
               <Text style={{ fontSize: 12, color: 'black', fontFamily: 'Poppins Medium', marginBottom: 8 }}>Numéro de téléphone</Text>
               <TextInput
@@ -107,7 +103,6 @@ export default function SignUpScreen({ navigation }) {
               />
             </View>
 
-            {/* Email */}
             <View style={{ marginBottom: 24, width: '100%' }}>
               <Text style={{ fontSize: 12, color: 'black', fontFamily: 'Poppins Medium', marginBottom: 8 }}>Email</Text>
               <TextInput
@@ -120,7 +115,6 @@ export default function SignUpScreen({ navigation }) {
               />
             </View>
 
-            {/* Mot de passe */}
             <View style={{ marginBottom: 24, width: '100%' }}>
               <Text style={{ fontSize: 12, color: 'black', fontFamily: 'Poppins Medium', marginBottom: 8 }}>Mot de passe</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f3f3', borderRadius: 8 }}>
@@ -137,7 +131,7 @@ export default function SignUpScreen({ navigation }) {
               </View>
             </View>
 
-            {/* Bouton inscription */}
+            {/* Bouton d'inscription */}
             <View style={{ width: '100%', marginTop: 12 }}>
               <TouchableOpacity
                 onPress={handleSignup}

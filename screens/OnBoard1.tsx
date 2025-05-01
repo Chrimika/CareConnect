@@ -76,7 +76,7 @@ export default function OnBoard1Screen({ navigation }: Props) {
       </View>
       <View style={{ borderColor: 'black', flex: 2, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
         <TouchableOpacity
-          onPress={() => navigation.navigate('onBoard2')}
+          onPress={() => navigation.replace('onBoard2')}
           style={{ backgroundColor: '#0EBE7F', width: '80%', padding: 10, borderRadius: 15 }}
         >
           <Text style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff', fontFamily: 'Poppins Medium' }}>Suivant</Text>

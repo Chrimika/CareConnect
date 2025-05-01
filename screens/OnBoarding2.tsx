@@ -43,7 +43,7 @@ export default function OnBoard2Screen({ navigation }: Props) {
           <Text style={{fontFamily:'Poppins Light', textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff' }}>Suivant</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.navigate('login')}
+          onPress={() => navigation.replace('login')}
           style={{
             backgroundColor: '#f5f5f5',
             width: '80%',
