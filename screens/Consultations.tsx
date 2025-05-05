@@ -17,9 +17,12 @@ import Geolocation from 'react-native-geolocation-service';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Mapbox, { MapView, Camera, MarkerView } from "@rnmapbox/maps";
+import Mapbox, { MapView, Camera, MarkerView, ShapeSource, LineLayer } from "@rnmapbox/maps";
+import axios from 'axios';
 
-Mapbox.setAccessToken("pk.eyJ1Ijoiam9yZWwtdGlvbWVsYSIsImEiOiJjbTdxbjhpNHgxMnFwMmpvanVwMm1odWh5In0.Sg7UkR0--3rsBywJvy3pIQ");
+// Configuration de Mapbox
+const MAPBOX_ACCESS_TOKEN = "pk.eyJ1Ijoiam9yZWwtdGlvbWVsYSIsImEiOiJjbTdxbjhpNHgxMnFwMmpvanVwMm1odWh5In0.Sg7UkR0--3rsBywJvy3pIQ";
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 const hospitals = [
   {
@@ -135,78 +138,81 @@ const ConsultationScreen = ({ navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedHospitalDetails, setSelectedHospitalDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const cameraRef = useRef(null);
   const scrollViewRef = useRef(null);
 
-  // Fonction pour simuler un itinéraire réaliste
-  const generateRealisticRoute = (start, end) => {
-    const intermediatePoints = [];
-    const steps = 5;
-    
-    for (let i = 1; i < steps; i++) {
-      const fraction = i / steps;
-      intermediatePoints.push([
-        start[0] + (end[0] - start[0]) * fraction + (Math.random() * 0.01 - 0.005),
-        start[1] + (end[1] - start[1]) * fraction + (Math.random() * 0.01 - 0.005)
-      ]);
+  const getRealRoute = async (start, end) => {
+    try {
+      const startCoords = `${start[0]},${start[1]}`;
+      const endCoords = `${end[0]},${end[1]}`;
+      
+      const response = await axios.get(
+        `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoords};${endCoords}?geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`
+      );
+      
+      if (response.data && response.data.routes && response.data.routes[0]) {
+        return {
+          route: response.data.routes[0].geometry,
+          distance: response.data.routes[0].distance / 1000,
+          duration: Math.ceil(response.data.routes[0].duration / 60)
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error('Error fetching route:', err);
+      return null;
     }
-    
-    return [start, ...intermediatePoints, end];
   };
 
-  const goToNextHospital = () => {
+  const goToNextHospital = async () => {
     if (!sortedHospitals.length || !position) return;
     
-    const newIndex = currentHospitalIndex % sortedHospitals.length;
+    const newIndex = (currentHospitalIndex + 1) % sortedHospitals.length;
     const hospital = sortedHospitals[newIndex];
-    setCurrentHospitalIndex(newIndex + 1);
+    setCurrentHospitalIndex(newIndex);
     setSelectedHospital(hospital);
     
-    // Animation de la caméra
     if (cameraRef.current) {
       cameraRef.current.setCamera({
         centerCoordinate: [hospital.longitude, hospital.latitude],
         zoomLevel: 15,
         pitch: 45,
         animationMode: 'flyTo',
-        animationDuration: 3000,
+        animationDuration: 2000,
       });
     }
     
-    // Générer un itinéraire réaliste
-    const coords = generateRealisticRoute(
+    const routeData = await getRealRoute(
       [position.longitude, position.latitude],
       [hospital.longitude, hospital.latitude]
     );
     
-    setRouteCoordinates(coords);
-    setRoute({
-      type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: coords,
-      }
-    });
-    
-    // Calcul de la distance
-    let totalDistance = 0;
-    for (let i = 1; i < coords.length; i++) {
-      const [lon1, lat1] = coords[i-1];
-      const [lon2, lat2] = coords[i];
-      totalDistance += haversineDistance(lat1, lon1, lat2, lon2);
+    if (routeData) {
+      setRouteCoordinates(routeData.route.coordinates);
+      setRoute({
+        type: 'Feature',
+        geometry: routeData.route
+      });
+      setDistanceText(`${routeData.distance.toFixed(2)} km (~${routeData.duration} min à pied)`);
+    } else {
+      const distance = haversineDistance(
+        position.latitude, 
+        position.longitude, 
+        hospital.latitude, 
+        hospital.longitude
+      );
+      const estimatedTime = Math.ceil((distance / 5) * 60);
+      setDistanceText(`${distance.toFixed(2)} km (~${estimatedTime} min à pied)`);
     }
     
-    const estimatedTimeMin = Math.ceil((totalDistance / 5) * 60);
-    setDistanceText(`${totalDistance.toFixed(2)} km (~${estimatedTimeMin} min à pied)`);
-    
-    // Faire défiler vers le haut
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const haversineDistance = (lat1, lon1, lat2, lon2) => {
     const toRad = (value) => (value * Math.PI) / 180;
-    const R = 6371; // km
+    const R = 6371;
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a =
@@ -219,53 +225,50 @@ const ConsultationScreen = ({ navigation }) => {
 
   const getPosition = async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
       const user = auth().currentUser;
       if (!user) {
-        Alert.alert('Erreur', 'Utilisateur non connecté');
-        setIsLoading(false);
-        return;
+        throw new Error('Utilisateur non connecté');
       }
 
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      const position = await new Promise((resolve, reject) => {
         Geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            setPosition({ latitude, longitude });
-
-            const sorted = hospitals
-              .map(h => ({
-                ...h,
-                distance: haversineDistance(latitude, longitude, h.latitude, h.longitude)
-              }))
-              .sort((a, b) => a.distance - b.distance);
-            setSortedHospitals(sorted);
-
-            try {
-              await AsyncStorage.setItem('userPosition', JSON.stringify({ latitude, longitude }));
-              await firestore().collection('users').doc(user.uid).update({
-                position: new firestore.GeoPoint(latitude, longitude),
-                updatedAt: firestore.FieldValue.serverTimestamp(),
-              });
-            } catch (error) {
-              console.error('Error saving position:', error);
-            }
-            
-            setIsLoading(false);
-          },
-          (error) => {
-            console.warn(error);
-            Alert.alert('Erreur', 'Impossible d\'obtenir la position de l\'utilisateur.');
-            setIsLoading(false);
-          },
+          position => resolve(position),
+          error => reject(error),
           {
             enableHighAccuracy: true,
             timeout: 15000,
             maximumAge: 10000,
           }
         );
-      } else {
-        // Fallback for web or unsupported platforms (for testing)
+      });
+
+      const { latitude, longitude } = position.coords;
+      setPosition({ latitude, longitude });
+
+      const sorted = hospitals
+        .map(h => ({
+          ...h,
+          distance: haversineDistance(latitude, longitude, h.latitude, h.longitude)
+        }))
+        .sort((a, b) => a.distance - b.distance);
+      
+      setSortedHospitals(sorted);
+
+      await AsyncStorage.setItem('userPosition', JSON.stringify({ latitude, longitude }));
+      await firestore().collection('users').doc(user.uid).update({
+        position: new firestore.GeoPoint(latitude, longitude),
+        updatedAt: firestore.FieldValue.serverTimestamp(),
+      });
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error getting position:', error);
+      setError(error.message || 'Impossible d\'obtenir la position');
+      
+      if (__DEV__) {
         const defaultPosition = { latitude: 3.87, longitude: 11.52 };
         setPosition(defaultPosition);
         
@@ -276,21 +279,14 @@ const ConsultationScreen = ({ navigation }) => {
           }))
           .sort((a, b) => a.distance - b.distance);
         setSortedHospitals(sorted);
-        
-        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error in getPosition:', error);
+      
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
     getPosition();
-    const interval = setInterval(() => {
-      getPosition();
-    }, 60000); // Update position every minute
-    return () => clearInterval(interval);
   }, []);
 
   const centerOnUser = () => {
@@ -304,10 +300,9 @@ const ConsultationScreen = ({ navigation }) => {
     }
   };
 
-  const handleHospitalPress = (item) => {
+  const handleHospitalPress = async (item) => {
     setSelectedHospital(item);
     
-    // Centrer sur l'hôpital sélectionné
     if (cameraRef.current) {
       cameraRef.current.setCamera({
         centerCoordinate: [item.longitude, item.latitude],
@@ -318,32 +313,29 @@ const ConsultationScreen = ({ navigation }) => {
       });
     }
 
-    // Générer un itinéraire si la position est disponible
     if (position) {
-      const coords = generateRealisticRoute(
+      const routeData = await getRealRoute(
         [position.longitude, position.latitude],
         [item.longitude, item.latitude]
       );
       
-      setRouteCoordinates(coords);
-      setRoute({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: coords,
-        }
-      });
-      
-      // Calcul de la distance
-      let totalDistance = 0;
-      for (let i = 1; i < coords.length; i++) {
-        const [lon1, lat1] = coords[i-1];
-        const [lon2, lat2] = coords[i];
-        totalDistance += haversineDistance(lat1, lon1, lat2, lon2);
+      if (routeData) {
+        setRouteCoordinates(routeData.route.coordinates);
+        setRoute({
+          type: 'Feature',
+          geometry: routeData.route
+        });
+        setDistanceText(`${routeData.distance.toFixed(2)} km (~${routeData.duration} min à pied)`);
+      } else {
+        const distance = haversineDistance(
+          position.latitude, 
+          position.longitude, 
+          item.latitude, 
+          item.longitude
+        );
+        const estimatedTime = Math.ceil((distance / 5) * 60);
+        setDistanceText(`${distance.toFixed(2)} km (~${estimatedTime} min à pied)`);
       }
-      
-      const estimatedTimeMin = Math.ceil((totalDistance / 5) * 60);
-      setDistanceText(`${totalDistance.toFixed(2)} km (~${estimatedTimeMin} min à pied)`);
     }
   };
 
@@ -360,9 +352,6 @@ const ConsultationScreen = ({ navigation }) => {
       ]}
       onPress={() => handleHospitalPress(item)}
       activeOpacity={0.7}
-      accessibilityLabel={`Hôpital ${item.name}`}
-      accessibilityRole="button"
-      accessibilityHint="Appuyer pour sélectionner cet hôpital et voir l'itinéraire"
     >
       <View>
         <Text style={styles.hospitalName}>{item.name}</Text>
@@ -376,9 +365,6 @@ const ConsultationScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.consultButton}
               onPress={() => handleConsultPress(item)}
-              accessibilityLabel="Bouton Consulter"
-              accessibilityRole="button"
-              accessibilityHint="Appuyer pour prendre rendez-vous dans cet établissement"
             >
               <Text style={styles.consultButtonText}>Consulter</Text>
             </TouchableOpacity>
@@ -388,7 +374,6 @@ const ConsultationScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  // Modal pour les détails et rendez-vous
   const renderConsultationModal = () => (
     <Modal
       animationType="slide"
@@ -439,19 +424,27 @@ const ConsultationScreen = ({ navigation }) => {
     <View style={{ flex: 1, backgroundColor: '#F5FCFF' }}>
       <StatusBar translucent backgroundColor={'transparent'} barStyle={'dark-content'} />
       
-      {/* Carte ou indicateur de chargement */}
       {isLoading ? (
-        <View style={{ height: 500, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#3a86ff" />
           <Text style={{ marginTop: 10 }}>Chargement de la carte...</Text>
         </View>
+      ) : error ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={getPosition}
+          >
+            <Text style={styles.retryButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
       ) : position ? (
         <>
-          {/* Carte avec une hauteur fixe */}
-          <View style={{ height: 500, position: 'relative' }}>
+          <View style={{ height: '50%', position: 'relative' }}>
             <MapView
               style={{ flex: 1 }}
-              styleURL={'mapbox://styles/mapbox/streets-v12'}
+              styleURL={'mapbox://styles/mapbox/streets-v11'}
               projection='globe'
               zoomEnabled
               rotateEnabled
@@ -467,15 +460,15 @@ const ConsultationScreen = ({ navigation }) => {
                 animationDuration={2000}
               />
               
-              {/* Marqueur de position utilisateur */}
               <MarkerView coordinate={[position.longitude, position.latitude]}>
-                <View style={styles.userMarker} />
+                <View style={styles.userMarker}>
+                  <View style={styles.userMarkerInner} />
+                </View>
               </MarkerView>
 
-              {/* Itinéraire */}
               {route && (
-                <Mapbox.ShapeSource id="routeSource" shape={route}>
-                  <Mapbox.LineLayer
+                <ShapeSource id="routeSource" shape={route}>
+                  <LineLayer
                     id="routeLayer"
                     style={{
                       lineColor: '#3a86ff',
@@ -484,20 +477,16 @@ const ConsultationScreen = ({ navigation }) => {
                       lineJoin: 'round',
                     }}
                   />
-                </Mapbox.ShapeSource>
+                </ShapeSource>
               )}
 
-              {/* Marqueurs d'hôpitaux */}
               {hospitals.map((hospital) => (
                 <MarkerView 
                   key={hospital.id} 
                   coordinate={[hospital.longitude, hospital.latitude]}
+                  anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <TouchableOpacity
-                    onPress={() => handleHospitalPress(hospital)}
-                    accessibilityLabel={`Marqueur de l'hôpital ${hospital.name}`}
-                    accessibilityRole="button"
-                  >
+                  <TouchableOpacity onPress={() => handleHospitalPress(hospital)}>
                     <View style={[
                       styles.hospitalMarker,
                       selectedHospital?.id === hospital.id && styles.selectedHospitalMarker
@@ -509,12 +498,9 @@ const ConsultationScreen = ({ navigation }) => {
               ))}
             </MapView>
 
-            {/* Boutons de contrôle */}
             <TouchableOpacity 
               style={styles.targetButton} 
               onPress={centerOnUser}
-              accessibilityLabel="Centrer sur ma position"
-              accessibilityRole="button"
             >
               <Image source={require('../assets/images/target.png')} style={{ width: 24, height: 24 }} />
             </TouchableOpacity>
@@ -522,47 +508,30 @@ const ConsultationScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.hospitalButton} 
               onPress={goToNextHospital}
-              accessibilityLabel="Prochain hôpital"
-              accessibilityRole="button"
-              accessibilityHint="Parcourir les hôpitaux proches"
             >
               <Image source={require('../assets/images/hosto.png')} style={{ width: 24, height: 24 }} />
             </TouchableOpacity>
           </View>
 
-          {/* Liste des hôpitaux */}
           <ScrollView 
             ref={scrollViewRef}
-            style={{ padding: 15 }}
+            style={{ flex: 1, padding: 15 }}
             contentContainerStyle={{ paddingBottom: 30 }}
-            showsVerticalScrollIndicator={true}
           >
             <Text style={styles.sectionTitle}>Hôpitaux à proximité</Text>
             <FlatList
-              data={hospitals}
+              data={sortedHospitals.length ? sortedHospitals : hospitals}
               keyExtractor={(item) => item.id}
               renderItem={renderHospitalItem}
-              scrollEnabled={false} // Désactive le scroll interne
+              scrollEnabled={false}
               showsVerticalScrollIndicator={false}
               ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
           </ScrollView>
 
-          {/* Modal de consultation */}
           {renderConsultationModal()}
         </>
-      ) : (
-        <View style={{ height: 500, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#3a86ff" />
-          <Text style={{ marginTop: 10 }}>Impossible d'obtenir votre position</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={getPosition}
-          >
-            <Text style={styles.retryButtonText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      ) : null}
     </View>
   );
 };
@@ -596,19 +565,16 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     color: '#212529',
   },
-  
   hospitalDetail: {
     fontSize: 14,
     color: '#495057',
     marginBottom: 3,
   },
-  
   distanceText: {
     marginTop: 8,
     color: '#3a86ff',
     fontWeight: '500',
   },
-  
   consultButton: {
     marginTop: 10,
     backgroundColor: '#3a86ff',
@@ -616,43 +582,51 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  
   consultButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  
   userMarker: {
-    height: 20,
-    width: 20,
-    backgroundColor: '#3a86ff',
-    borderRadius: 10,
+    height: 24,
+    width: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#3a86ff',
   },
-  
+  userMarkerInner: {
+    height: 12,
+    width: 12,
+    borderRadius: 6,
+    backgroundColor: '#3a86ff',
+  },
   hospitalMarker: {
-    height: 30,
-    width: 30,
+    height: 36,
+    width: 36,
     backgroundColor: 'red',
-    borderRadius: 15,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  
   selectedHospitalMarker: {
     backgroundColor: '#3a86ff',
     transform: [{ scale: 1.2 }],
+    zIndex: 10,
   },
-  
   markerText: {
     color: 'white',
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  
   targetButton: {
     position: 'absolute',
     bottom: 30,
@@ -666,7 +640,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
-  
   hospitalButton: {
     position: 'absolute',
     bottom: 30,
@@ -680,7 +653,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
   },
-  
   retryButton: {
     marginTop: 15,
     backgroundColor: '#3a86ff',
@@ -689,12 +661,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     elevation: 2,
   },
-  
   retryButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -702,7 +672,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  
   modalContent: {
     width: '100%',
     backgroundColor: 'white',
@@ -714,7 +683,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -722,13 +690,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
-  
   modalSeparator: {
     height: 1,
     backgroundColor: '#e9ecef',
     marginVertical: 10,
   },
-  
   modalSubtitle: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -736,26 +702,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 5,
   },
-  
   modalText: {
     fontSize: 14,
     color: '#495057',
     marginBottom: 5,
   },
-  
   modalComment: {
     fontSize: 14,
     color: '#6c757d',
     marginLeft: 5,
     marginBottom: 3,
   },
-  
   modalButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
   },
-  
   modalButton: {
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -763,25 +725,22 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     alignItems: 'center',
   },
-  
   modalButtonPrimary: {
     backgroundColor: '#3a86ff',
   },
-  
   modalButtonSecondary: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#dee2e6',
   },
-  
   modalButtonPrimaryText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  
   modalButtonSecondaryText: {
     color: '#495057',
     fontWeight: '500',
   },
 });
+
 export default ConsultationScreen;
