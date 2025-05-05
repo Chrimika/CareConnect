@@ -1,4 +1,5 @@
-package com.careconnect
+package com.wizeman.piolcare
+
 import android.os.Bundle
 import org.devio.rn.splashscreen.SplashScreen
 import com.facebook.react.ReactActivity

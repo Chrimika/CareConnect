@@ -36,13 +36,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.careconnect"
+    namespace "com.wizeman.piolcare"
     defaultConfig {
-        applicationId "com.careconnect"
+        applicationId "com.wizeman.piolcare"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.0.0"
+        versionCode 5
+        versionName "1.0.1"
     }
     signingConfigs {
 

@@ -1,4 +1,4 @@
-package com.careconnect
+package com.wizeman.piolcare
 
 import android.app.Application
 import com.facebook.react.PackageList
