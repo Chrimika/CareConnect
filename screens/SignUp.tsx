@@ -154,9 +154,9 @@ export default function SignUpScreen({ navigation }) {
 
             {/* Lien vers connexion */}
             <View style={{ width: '100%', flex: 0.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
-              <Text style={{ color: 'black', fontSize: 14, fontFamily: 'Rubik Medium' }}>Déjà inscrit ? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('login')}>
-                <Text style={{ color: '#0bcb95', fontSize: 14, fontFamily: 'Rubik Medium', textDecorationLine: 'underline' }}>Se connecter</Text>
+              <Text style={{ color: 'black', fontSize: 14, fontFamily: 'Rubik Medium' }}>J'ai un hopital ? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('signup-admin')}>
+                <Text style={{ color: '#0bcb95', fontSize: 14, fontFamily: 'Rubik Medium', textDecorationLine: 'underline' }}>inscriription admin</Text>
               </TouchableOpacity>
             </View>
           </View>
