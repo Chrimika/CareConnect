@@ -13,36 +13,41 @@ export default function MedecinScreen({ navigation }) {
       try {
         const adminId = auth().currentUser?.uid;
         if (!adminId) return;
-
+  
         // 1. Récupérer les hôpitaux de l'admin
         const hospitalsSnapshot = await firestore()
           .collection('hospitals')
           .where('adminId', '==', adminId)
           .get();
-
+  
         const hospitalIds = hospitalsSnapshot.docs.map(doc => doc.id);
-
-        // 2. Récupérer les médecins de ces hôpitaux
-        if (hospitalIds.length > 0) {
-          const medecinsSnapshot = await firestore()
-            .collection('medecins')
-            .where('hospitalId', 'in', hospitalIds)
-            .get();
-
-          const medecinsData = medecinsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-
-          setMedecins(medecinsData);
+  
+        // 2. Vérifier si on a des hôpitaux avant de faire la requête
+        if (hospitalIds.length === 0) {
+          setMedecins([]);
+          setLoading(false);
+          return;
         }
+  
+        // 3. Récupérer les médecins de ces hôpitaux
+        const medecinsSnapshot = await firestore()
+          .collection('medecins')
+          .where('hospitalId', 'in', hospitalIds)
+          .get();
+  
+        const medecinsData = medecinsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+  
+        setMedecins(medecinsData);
       } catch (error) {
         console.error("Erreur:", error);
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchMedecins();
   }, []);
 

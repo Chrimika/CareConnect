@@ -12,6 +12,7 @@ export default function HospitalAdminScreen({ navigation }) {
     const fetchHospitals = async () => {
       try {
         const adminId = auth().currentUser?.uid;
+        console.log("Admin ID:", adminId);
         if (!adminId) return;
 
         const snapshot = await firestore()

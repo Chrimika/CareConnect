@@ -23,15 +23,6 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
 
-    const checkUser = async () => {
-      const user = await AsyncStorage.getItem('user'); // Suppose que tu stockes l'ID utilisateur ou un indicateur de connexion
-      if (user) {
-        // Si un utilisateur est trouvé, naviguer directement vers l'écran 'Home'
-        navigation.replace('Home');
-      }
-    };
-    checkUser();
-
     const unsubscribe = auth().onAuthStateChanged(user => {
       if (user) {
         fetchUserData(user.uid);
@@ -43,15 +34,26 @@ export default function LoginScreen({ navigation }) {
   const fetchUserData = async (uid) => {
     try {
       const doc = await firestore().collection('users').doc(uid).get();
+      
       if (doc.exists) {
-        await AsyncStorage.setItem('user', JSON.stringify({
+        const userData = {
           uid,
           ...doc.data()
-        }));
-        navigation.replace('Home');
+        };
+
+        await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+        // Vérification du rôle et redirection appropriée
+        if (userData.role === 'admin') {
+          navigation.replace('AdminDashboard');
+        } else {
+          navigation.replace('AdminDashboard');
+        }
       }
     } catch (error) {
       console.error("Erreur récupération données:", error);
+      // Optionnel : Afficher un message d'erreur à l'utilisateur
+      Alert.alert("Erreur", "Impossible de charger les données utilisateur");
     }
   };
 
@@ -216,7 +218,8 @@ const styles = StyleSheet.create({
   passwordField: {
     flex: 1,
     padding: 15,
-    fontSize: 16
+    fontSize: 16,
+    color:'black'
   },
   eyeIcon: {
     padding: 15

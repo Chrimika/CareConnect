@@ -34,7 +34,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const userData = await AsyncStorage.getItem('adminUser');
+        const userData = await AsyncStorage.getItem('user');
         if (userData) {
           setInitialRoute('Home');
         }
@@ -54,7 +54,7 @@ const App = () => {
     useEffect(() => {
       const checkUserRole = async () => {
         try {
-          const userData = await AsyncStorage.getItem('adminUser');
+          const userData = await AsyncStorage.getItem('user');
           if (userData) {
             const parsedData = JSON.parse(userData);
             setUserRole(parsedData.role);
@@ -126,7 +126,7 @@ const App = () => {
           />
           <Tab.Screen 
             name="Profil" 
-            component={AdminProfileScreen} 
+            component={ProfileScreen} 
             options={{ headerShown: false }} 
           />
         </Tab.Navigator>

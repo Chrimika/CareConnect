@@ -332,12 +332,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
+
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#09d1a0',
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom:10,
     textAlign: 'center',
   },
   inputContainer: {
@@ -453,7 +455,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom:40,
+
   },
   submitButtonText: {
     color: 'white',

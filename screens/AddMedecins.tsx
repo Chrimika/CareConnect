@@ -215,8 +215,9 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#09d1a0',
-    marginBottom: 20,
+    marginTop: 30,
     textAlign: 'center',
+    marginBottom:10
   },
   inputContainer: {
     marginBottom: 20,
@@ -233,6 +234,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    color:'black'
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -245,6 +247,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     fontSize: 16,
+    color:'black'
   },
   eyeIcon: {
     padding: 12,
@@ -280,7 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 40,
   },
   submitButtonText: {
     color: 'white',

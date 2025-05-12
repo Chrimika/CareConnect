@@ -7596,6 +7596,11 @@ react-native-css-interop@^0.1.22, react-native-css-interop@0.1.22:
     lightningcss "^1.27.0"
     semver "^7.6.3"
 
+react-native-date-picker@^5.0.12:
+  version "5.0.12"
+  resolved "https://registry.npmjs.org/react-native-date-picker/-/react-native-date-picker-5.0.12.tgz"
+  integrity sha512-R/mUnCKhcuxbhKPFwYdBQCxQt9HHLqpM4ruRUqlcBjiUZ3N2wdnwOMyc888Ps8qp8e7v29PrDHtUlG8LPuFn9w==
+
 react-native-datepicker@^1.7.2:
   version "1.7.2"
   resolved "https://registry.npmjs.org/react-native-datepicker/-/react-native-datepicker-1.7.2.tgz"

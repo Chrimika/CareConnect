@@ -153,7 +153,7 @@ export default function SignUpScreen({ navigation }) {
             </View>
 
             {/* Lien vers connexion */}
-            <View style={{ width: '100%', flex: 0.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
+            <View style={{ borderWidth:1,borderColor:'transparent',width: '100%', flex: 0.5, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20 }}>
               <Text style={{ color: 'black', fontSize: 14, fontFamily: 'Rubik Medium' }}>J'ai un hopital ? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('signup-admin')}>
                 <Text style={{ color: '#0bcb95', fontSize: 14, fontFamily: 'Rubik Medium', textDecorationLine: 'underline' }}>inscriription admin</Text>
