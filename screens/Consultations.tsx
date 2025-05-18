@@ -19,6 +19,8 @@ import auth from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Mapbox, { MapView, Camera, MarkerView, ShapeSource, LineLayer } from "@rnmapbox/maps";
 import axios from 'axios';
+import DatePicker from 'react-native-date-picker';
+
 
 // Configuration de Mapbox
 const MAPBOX_ACCESS_TOKEN = "pk.eyJ1Ijoiam9yZWwtdGlvbWVsYSIsImEiOiJjbTdxbjhpNHgxMnFwMmpvanVwMm1odWh5In0.Sg7UkR0--3rsBywJvy3pIQ";
@@ -139,6 +141,8 @@ const ConsultationScreen = ({ navigation }) => {
   const [selectedHospitalDetails, setSelectedHospitalDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [appointmentDate, setAppointmentDate] = useState(new Date());
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
 
   const cameraRef = useRef(null);
   const scrollViewRef = useRef(null);
@@ -343,7 +347,66 @@ const ConsultationScreen = ({ navigation }) => {
     setSelectedHospitalDetails(hospital);
     setModalVisible(true);
   };
-
+  const handleTakeAppointment = async () => {
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        Alert.alert("Erreur", "Vous devez être connecté pour prendre un rendez-vous");
+        return;
+      }
+  
+      // Récupérer les infos du patient depuis Firestore
+      const patientDoc = await firestore().collection('users').doc(user.uid).get();
+      if (!patientDoc.exists) {
+        throw new Error("Profil patient introuvable");
+      }
+  
+      const patientData = patientDoc.data();
+  
+      // Créer l'objet rendez-vous
+      const appointmentData = {
+        patientId: user.uid,
+        patientName: `${patientData.firstName} ${patientData.lastName}`,
+        patientPhone: patientData.phone || 'Non renseigné',
+        hospitalId: selectedHospitalDetails.id,
+        hospitalName: selectedHospitalDetails.name,
+        date: new Date(), // Date actuelle (à remplacer par un sélecteur de date)
+        status: 'pending', // pending, confirmed, cancelled, completed
+        price: selectedHospitalDetails.price,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      };
+  
+      // Ajouter à la collection appointments
+      await firestore().collection('appointments').add(appointmentData);
+  
+      // Mettre à jour les sous-collections (optionnel mais pratique)
+      await firestore().collection('hospitals').doc(selectedHospitalDetails.id)
+        .collection('appointments').add({
+          ...appointmentData,
+          patientRef: firestore().collection('users').doc(user.uid)
+        });
+  
+      await firestore().collection('users').doc(user.uid)
+        .collection('appointments').add({
+          ...appointmentData,
+          hospitalRef: firestore().collection('hospitals').doc(selectedHospitalDetails.id)
+        });
+  
+      Alert.alert(
+        "Succès", 
+        "Votre rendez-vous a été enregistré. Vous recevrez une confirmation par SMS."
+      );
+      setModalVisible(false);
+      
+    } catch (error) {
+      console.error("Erreur prise de RDV:", error);
+      Alert.alert(
+        "Erreur", 
+        error.message || "Une erreur est survenue lors de la prise de rendez-vous"
+      );
+    }
+  };
   const renderHospitalItem = ({ item }) => (
     <TouchableOpacity 
       style={[
@@ -391,9 +454,42 @@ const ConsultationScreen = ({ navigation }) => {
           <Text style={styles.modalText}>Prix consultation: {selectedHospitalDetails?.price} FCFA</Text>
           <Text style={styles.modalText}>Note: {selectedHospitalDetails?.rating}/5</Text>
           <Text style={styles.modalText}>Heures d'ouverture: {selectedHospitalDetails?.openingHours?.start}h - {selectedHospitalDetails?.openingHours?.end}h</Text>
-          
+          <Text style={styles.modalSubtitle}>Date du rendez-vous</Text>
+          <TouchableOpacity 
+            style={styles.datePickerButton}
+            onPress={() => setDatePickerVisible(true)}
+          >
+            <Text style={styles.datePickerButtonText}>
+              {appointmentDate.toLocaleString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </Text>
+          </TouchableOpacity>
+  
+          <DatePicker
+            modal
+            open={datePickerVisible}
+            date={appointmentDate}
+            onConfirm={(date) => {
+              setDatePickerVisible(false);
+              setAppointmentDate(date);
+            }}
+            onCancel={() => setDatePickerVisible(false)}
+            minuteInterval={15}
+            minimumDate={new Date()}
+            locale="fr"
+            title="Sélectionnez une date"
+            confirmText="Confirmer"
+            cancelText="Annuler"
+          />
+  
           <Text style={styles.modalSubtitle}>Commentaires</Text>
-          {selectedHospitalDetails?.comments.map((comment, index) => (
+          {selectedHospitalDetails?.comments?.map((comment, index) => (
             <Text key={index} style={styles.modalComment}>• {comment}</Text>
           ))}
           
@@ -407,10 +503,7 @@ const ConsultationScreen = ({ navigation }) => {
             
             <TouchableOpacity 
               style={[styles.modalButton, styles.modalButtonPrimary]}
-              onPress={() => {
-                setModalVisible(false);
-                Alert.alert('Rendez-vous', 'Votre rendez-vous a été pris en compte. Vous recevrez une confirmation bientôt.');
-              }}
+              onPress={handleTakeAppointment}
             >
               <Text style={styles.modalButtonPrimaryText}>Prendre RDV</Text>
             </TouchableOpacity>
@@ -740,6 +833,19 @@ const styles = StyleSheet.create({
   modalButtonSecondaryText: {
     color: '#495057',
     fontWeight: '500',
+  },
+  datePickerButton: {
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    marginVertical: 10,
+    alignItems: 'center'
+  },
+  datePickerButtonText: {
+    color: '#495057',
+    fontSize: 14
   },
 });
 
