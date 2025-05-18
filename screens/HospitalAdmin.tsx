@@ -1,48 +1,75 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Pressable } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function HospitalAdminScreen({ navigation }) {
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchHospitals = async () => {
+    const adminId = auth().currentUser?.uid;
+    if (!adminId) {
+      setLoading(false);
+      return;
+    }
+
+    const CACHE_KEY = `@hospitals_${adminId}`;
+
+    // 1. Vérifier le cache local
+    const checkCache = async () => {
       try {
-        const adminId = auth().currentUser?.uid;
-        console.log("Admin ID:", adminId);
-        if (!adminId) return;
-
-        const snapshot = await firestore()
-          .collection('hospitals')
-          .where('adminId', '==', adminId)
-          .get();
-
-        const hospitalsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-        setHospitals(hospitalsData);
+        const cachedData = await AsyncStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+          setHospitals(JSON.parse(cachedData));
+          setLoading(false);
+        }
       } catch (error) {
-        console.error("Erreur:", error);
-      } finally {
-        setLoading(false);
+        console.log("Erreur cache:", error);
       }
     };
 
-    fetchHospitals();
+    // 2. Configurer l'écouteur temps réel
+    const setupRealtimeListener = () => {
+      return firestore()
+        .collection('hospitals')
+        .where('adminId', '==', adminId)
+        .onSnapshot(async (snapshot) => {
+          const hospitalsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+
+          setHospitals(hospitalsData);
+          setLoading(false);
+
+          // Mettre à jour le cache
+          try {
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(hospitalsData));
+          } catch (error) {
+            console.log("Erreur sauvegarde cache:", error);
+          }
+        }, (error) => {
+          console.error("Erreur temps réel:", error);
+          setLoading(false);
+        });
+    };
+
+    checkCache();
+    const unsubscribe = setupRealtimeListener();
+
+    return () => unsubscribe();
   }, []);
 
   const renderHospitalItem = ({ item }) => (
-    <TouchableOpacity 
+    <Pressable 
       style={styles.hospitalCard}
       onPress={() => navigation.navigate('HospitalDetails', { hospitalId: item.id })}
     >
       {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.hospitalLogo} />
+        <Image defaultSource={require('../assets/images/HospitalEmpty.png')} source={{ uri: item.logo }} style={styles.hospitalLogo} />
       ) : (
         <View style={styles.logoPlaceholder}>
           <Icon name="medical" size={24} color="#09d1a0" />
@@ -58,8 +85,17 @@ export default function HospitalAdminScreen({ navigation }) {
           </Text>
         )}
       </View>
-      <Icon name="chevron-forward" size={20} color="#09d1a0" />
-    </TouchableOpacity>
+      <View style={{display:'flex',flexDirection:'row',marginTop:'auto'}}>
+        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',borderRadius:'50%'}}>
+           <Icon name="create-outline" size={20} color="#09d1a0"  />
+        </Pressable>
+        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',marginLeft:15,borderRadius:'50%'}}>
+          <Icon name="trash" size={20} color="red"/>
+        </Pressable>
+        
+      </View>
+     
+    </Pressable>
   );
 
   if (loading) {
@@ -98,17 +134,18 @@ export default function HospitalAdminScreen({ navigation }) {
       )}
 
       {/* Bouton d'ajout */}
-      <TouchableOpacity
+      <Pressable
         style={styles.addButton}
         onPress={() => navigation.navigate('add-hospital')}
       >
         <Icon name="add" size={28} color="white" />
-      </TouchableOpacity>
+      </Pressable>
       <Text style={styles.addButtonText}>Nouveau</Text>
     </View>
   );
 }
 
+// Gardez le même StyleSheet que dans votre code original
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -116,7 +153,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingTop: 20,
+    paddingTop: 40,
   },
   title: {
     fontSize: 24,
@@ -153,22 +190,24 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   hospitalLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     marginRight: 15,
   },
   logoPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
   hospitalInfo: {
+    height:100,
     flex: 1,
+    justifyContent:'center'
   },
   hospitalName: {
     fontSize: 16,

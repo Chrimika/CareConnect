@@ -24,6 +24,7 @@ import SignUpHospitalAdminScreen from './screens/SignUpAdmin'
 import AddHospitalScreen from './screens/AddHospital'
 import AddMedecinScreen from './screens/AddMedecins';
 import MedecinScreen from './screens/MedecinScreen';
+import HospitalDetailsScreen from './screens/HopitalDetails';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -93,6 +94,16 @@ const App = () => {
             },
             tabBarActiveTintColor: '#09d1a0',
             tabBarInactiveTintColor: '#6e6e6e',
+            tabBarHideOnKeyboard: true,
+            tabBarButton: (props) => (
+            <TouchableWithoutFeedback
+              onPress={props.onPress}
+              accessibilityRole="button"
+              accessible
+            >
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>{props.children}</View>
+            </TouchableWithoutFeedback>
+          ),
             tabBarStyle: { 
               backgroundColor: '#fff', 
               borderTopWidth: 0,
@@ -106,7 +117,6 @@ const App = () => {
               fontSize: 12,
               marginBottom: 5
             },
-            tabBarHideOnKeyboard: true,
           })}
         >
           <Tab.Screen 
@@ -173,6 +183,15 @@ const App = () => {
             marginBottom: 5
           },
           tabBarHideOnKeyboard: true,
+          tabBarButton: (props) => (
+            <TouchableWithoutFeedback
+              onPress={props.onPress}
+              accessibilityRole="button"
+              accessible
+            >
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>{props.children}</View>
+            </TouchableWithoutFeedback>
+          ),
         })}
       >
         <Tab.Screen 
@@ -258,7 +277,12 @@ const App = () => {
           component={AddMedecinScreen} 
           options={{ headerShown: false }} 
         />
-
+        <Stack.Screen 
+          name="HospitalDetails" 
+          component={HospitalDetailsScreen} 
+          options={{ headerShown: false }} 
+        />
+        
         
       </Stack.Navigator>
     </NavigationContainer>

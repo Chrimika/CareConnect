@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
@@ -141,12 +141,12 @@ const AddMedecinScreen = ({ navigation, route }) => {
             placeholder="••••••••"
             secureTextEntry={!showPassword}
           />
-          <TouchableOpacity 
+          <Pressable 
             style={styles.eyeIcon}
             onPress={() => setShowPassword(!showPassword)}
           >
             <Icon name={showPassword ? 'eye-off' : 'eye'} size={20} color="#666" />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -154,7 +154,7 @@ const AddMedecinScreen = ({ navigation, route }) => {
         <Text style={styles.label}>Spécialité *</Text>
         <View style={styles.selectContainer}>
           {specialites.map(item => (
-            <TouchableOpacity
+            <Pressable
               key={item.value}
               style={[
                 styles.selectOption,
@@ -165,7 +165,7 @@ const AddMedecinScreen = ({ navigation, route }) => {
               <Text style={specialite === item.value ? styles.selectOptionTextSelected : styles.selectOptionText}>
                 {item.label}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       </View>
@@ -174,7 +174,7 @@ const AddMedecinScreen = ({ navigation, route }) => {
         <Text style={styles.label}>Hôpital *</Text>
         <View style={styles.selectContainer}>
           {hospitals.map(hospital => (
-            <TouchableOpacity
+            <Pressable
               key={hospital.id}
               style={[
                 styles.selectOption,
@@ -185,12 +185,12 @@ const AddMedecinScreen = ({ navigation, route }) => {
               <Text style={selectedHospital === hospital.id ? styles.selectOptionTextSelected : styles.selectOptionText}>
                 {hospital.name}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       </View>
 
-      <TouchableOpacity 
+      <Pressable 
         style={styles.submitButton} 
         onPress={createMedecin}
         disabled={loading}
@@ -200,7 +200,7 @@ const AddMedecinScreen = ({ navigation, route }) => {
         ) : (
           <Text style={styles.submitButtonText}>Enregistrer le médecin</Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </ScrollView>
   );
 };

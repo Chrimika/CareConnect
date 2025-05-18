@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Pressable } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Geolocation from 'react-native-geolocation-service';
@@ -32,6 +32,7 @@ const AddHospitalScreen = ({ navigation }) => {
   const [logoUri, setLogoUri] = useState(null);
   const [openingHours, setOpeningHours] = useState({});
   const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState('');
   const [consultationDuration, setConsultationDuration] = useState(null);
   const [loading, setLoading] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -70,6 +71,31 @@ const AddHospitalScreen = ({ navigation }) => {
     );
   };
 
+  const getAddressFromCoordinates = async (lat, lng) => {
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      
+      if (response.data && response.data.address) {
+        const addr = response.data.address;
+        // Construction de l'adresse à partir des composants disponibles
+        let fullAddress = '';
+        if (addr.road) fullAddress += addr.road + ', ';
+        if (addr.neighbourhood) fullAddress += addr.neighbourhood + ', ';
+        if (addr.suburb) fullAddress += addr.suburb + ', ';
+        if (addr.city) fullAddress += addr.city + ', ';
+        if (addr.country) fullAddress += addr.country;
+        
+        return fullAddress.trim().replace(/,$/, '');
+      }
+      return '';
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'adresse:', error);
+      return '';
+    }
+  };
+
   const getCurrentLocation = async () => {
     setLocationLoading(true);
     try {
@@ -77,12 +103,18 @@ const AddHospitalScreen = ({ navigation }) => {
       
       if (status === RESULTS.GRANTED) {
         Geolocation.getCurrentPosition(
-          (position) => {
+          async (position) => {
+            const { latitude, longitude } = position.coords;
             setLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
+              latitude,
+              longitude,
             });
-            Alert.alert('Succès', 'Position enregistrée avec succès');
+            
+            // Récupération de l'adresse
+            const addr = await getAddressFromCoordinates(latitude, longitude);
+            setAddress(addr);
+            
+            Alert.alert('Succès', 'Position et adresse enregistrées avec succès');
             setLocationLoading(false);
           },
           (error) => {
@@ -172,13 +204,15 @@ const AddHospitalScreen = ({ navigation }) => {
         throw new Error("Admin non connecté");
       }
   
-      // 3. Création de l'hôpital avec l'ID admin
+      // 3. Création de l'hôpital avec toutes les données
       await firestore().collection('hospitals').add({
         name: hospitalName,
         logo: logoUrl,
+        address: address,
         location: location ? new firestore.GeoPoint(location.latitude, location.longitude) : null,
+        openingHours: openingHours,
         consultationDuration: parseInt(consultationDuration),
-        adminId: adminId, // Ajout de l'ID admin
+        adminId: adminId,
         createdAt: firestore.FieldValue.serverTimestamp(),
       });
   
@@ -211,7 +245,7 @@ const AddHospitalScreen = ({ navigation }) => {
       {/* Logo */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Logo</Text>
-        <TouchableOpacity style={styles.logoButton} onPress={selectLogo}>
+        <Pressable style={styles.logoButton} onPress={selectLogo}>
           {logoUri ? (
             <Image source={{ uri: logoUri }} style={styles.logoPreview} />
           ) : (
@@ -220,13 +254,13 @@ const AddHospitalScreen = ({ navigation }) => {
               <Text style={styles.logoText}>Ajouter un logo</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Localisation */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Localisation</Text>
-        <TouchableOpacity 
+        <Pressable 
           style={styles.locationButton} 
           onPress={confirmLocation}
           disabled={locationLoading}
@@ -241,11 +275,18 @@ const AddHospitalScreen = ({ navigation }) => {
               </Text>
             </>
           )}
-        </TouchableOpacity>
+        </Pressable>
         {location && (
-          <Text style={styles.locationCoords}>
-            Lat: {location.latitude.toFixed(4)}, Long: {location.longitude.toFixed(4)}
-          </Text>
+          <>
+            <Text style={styles.locationCoords}>
+              Lat: {location.latitude.toFixed(4)}, Long: {location.longitude.toFixed(4)}
+            </Text>
+            {address ? (
+              <Text style={styles.addressText}>
+                Adresse: {address}
+              </Text>
+            ) : null}
+          </>
         )}
       </View>
 
@@ -254,7 +295,7 @@ const AddHospitalScreen = ({ navigation }) => {
         <Text style={styles.label}>Durée moyenne de consultation *</Text>
         <View style={styles.durationContainer}>
           {consultationDurations.map(duration => (
-            <TouchableOpacity
+            <Pressable
               key={duration.value}
               style={[
                 styles.durationButton,
@@ -268,7 +309,7 @@ const AddHospitalScreen = ({ navigation }) => {
               ]}>
                 {duration.label}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
         </View>
       </View>
@@ -278,7 +319,7 @@ const AddHospitalScreen = ({ navigation }) => {
         <Text style={styles.label}>Horaires d'ouverture</Text>
         {daysOfWeek.map(day => (
           <View key={day.value} style={styles.dayContainer}>
-            <TouchableOpacity 
+            <Pressable 
               style={styles.dayCheckbox} 
               onPress={() => toggleDayClosed(day.value)}
             >
@@ -288,7 +329,7 @@ const AddHospitalScreen = ({ navigation }) => {
                 color="#09d1a0" 
               />
               <Text style={styles.dayText}>{day.label}</Text>
-            </TouchableOpacity>
+            </Pressable>
 
             {!openingHours[day.value]?.closed && (
               <View style={styles.timeInputs}>
@@ -312,7 +353,7 @@ const AddHospitalScreen = ({ navigation }) => {
       </View>
 
       {/* Bouton de soumission */}
-      <TouchableOpacity 
+      <Pressable 
         style={styles.submitButton} 
         onPress={createHospital}
         disabled={loading}
@@ -322,7 +363,7 @@ const AddHospitalScreen = ({ navigation }) => {
         ) : (
           <Text style={styles.submitButtonText}>Créer l'hôpital</Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     </ScrollView>
   );
 };
@@ -332,14 +373,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 20,
-
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#09d1a0',
     marginTop: 20,
-    marginBottom:10,
+    marginBottom: 10,
     textAlign: 'center',
   },
   inputContainer: {
@@ -395,6 +435,11 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
     fontStyle: 'italic',
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 5,
   },
   durationContainer: {
     flexDirection: 'row',
@@ -455,8 +500,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     alignItems: 'center',
-    marginBottom:40,
-
+    marginBottom: 40,
   },
   submitButtonText: {
     color: 'white',

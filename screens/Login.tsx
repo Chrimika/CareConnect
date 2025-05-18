@@ -47,7 +47,7 @@ export default function LoginScreen({ navigation }) {
         if (userData.role === 'admin') {
           navigation.replace('AdminDashboard');
         } else {
-          navigation.replace('AdminDashboard');
+          navigation.replace('Home');
         }
       }
     } catch (error) {

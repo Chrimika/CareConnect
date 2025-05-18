@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Pressable } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import firestore from '@react-native-firebase/firestore';
@@ -52,7 +52,7 @@ export default function MedecinScreen({ navigation }) {
   }, []);
 
   const renderMedecinItem = ({ item }) => (
-    <TouchableOpacity 
+    <Pressable 
       style={styles.medecinCard}
       onPress={() => navigation.navigate('MedecinDetails', { medecinId: item.id })}
     >
@@ -67,8 +67,15 @@ export default function MedecinScreen({ navigation }) {
           <Icon name="mail" size={14} color="#666" /> {item.email}
         </Text>
       </View>
-      <Icon name="chevron-forward" size={20} color="#09d1a0" />
-    </TouchableOpacity>
+      <View style={{display:'flex',flexDirection:'row',marginTop:'auto'}}>
+        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',borderRadius:'50%'}}>
+            <Icon name="create-outline" size={20} color="#09d1a0"  />
+        </Pressable>
+        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',marginLeft:15,borderRadius:'50%'}}>
+          <Icon name="trash" size={20} color="red"/>
+        </Pressable>
+      </View>
+    </Pressable>
   );
 
   if (loading) {
@@ -107,12 +114,12 @@ export default function MedecinScreen({ navigation }) {
       )}
 
       {/* Bouton d'ajout */}
-      <TouchableOpacity
+      <Pressable
         style={styles.addButton}
         onPress={() => navigation.navigate('add-medecins')}
       >
         <Icon name="add" size={28} color="white" />
-      </TouchableOpacity>
+      </Pressable>
       <Text style={styles.addButtonText}>Nouveau</Text>
     </View>
   );
@@ -125,7 +132,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingTop: 20,
+    paddingTop: 40,
   },
   title: {
     fontSize: 24,
@@ -162,9 +169,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -194,7 +201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyImage: {
-    width: 231,
+    width: 200,
     height: 200,
     marginBottom: 20,
   },
