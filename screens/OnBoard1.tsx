@@ -27,21 +27,30 @@ export default function OnBoard1Screen({ navigation }: Props) {
   const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
-    // Vérifier si un utilisateur est stocké localement (par exemple, via AsyncStorage)
-    const checkUser = async () => {
-      const user = await AsyncStorage.getItem('user'); // Suppose que tu stockes l'ID utilisateur ou un indicateur de connexion
-      if (user) {
-        // Si un utilisateur est trouvé, naviguer directement vers l'écran 'Home'
-        navigation.replace('Home');
+    const checkAuthStatus = async () => {
+      try {
+        // Vérifier d'abord les données utilisateur
+        const userData = await AsyncStorage.getItem('user');
+        
+        if (userData) {
+          const parsedData = JSON.parse(userData);
+          
+          // Vérifier si l'utilisateur est un admin
+          if (parsedData.role === 'admin') {
+            navigation.replace('AdminDashboard'); // Redirection vers le dashboard admin
+          } else {
+            navigation.replace('Home'); // Redirection vers l'interface standard
+          }
+        }
+      } catch (error) {
+        console.error("Error checking auth status:", error);
       }
     };
-
-    checkUser();
-
-    // Écoute les changements de connexion réseau
-    const unsubscribe = NetInfo.addEventListener(state => {
+  
+    // Écoute des changements de connexion réseau
+    const unsubscribeNetInfo = NetInfo.addEventListener(state => {
       setIsConnected(state.isConnected);
-
+  
       if (!state.isConnected) {
         Toast.show('Bienvenu, Connectez vous a internet svp.', {
           duration: Toast.durations.LONG,
@@ -55,9 +64,13 @@ export default function OnBoard1Screen({ navigation }: Props) {
         });
       }
     });
-
-    // Nettoyage de l'abonnement
-    return () => unsubscribe();
+  
+    checkAuthStatus();
+  
+    // Nettoyage
+    return () => {
+      unsubscribeNetInfo();
+    };
   }, []);
 
   return (
