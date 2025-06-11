@@ -1,4 +1,4 @@
-package com.wizeman.piolcare
+package com.wizeman.proxicare
 
 import android.os.Bundle
 import org.devio.rn.splashscreen.SplashScreen

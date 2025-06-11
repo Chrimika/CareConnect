@@ -142,7 +142,7 @@ export default function HomeScreen() {
           <ImageBackground resizeMode='contain' source={require('../assets/images/doctorHero.png')} style={{flex:0.6}}></ImageBackground>
           <View style={{flex:0.4,paddingHorizontal:15,justifyContent:'center'}}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Consultations')}
+              onPress={() => navigation.navigate('ListHosto')}
               style={{ backgroundColor: '#0bcb95', width: '100%', padding: 10, borderRadius: 15 }}
             >
               <Text style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff',fontFamily:'Poppins Medium' }}>Consulter</Text>

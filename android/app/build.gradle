@@ -36,12 +36,12 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.wizeman.piolcare"
+    namespace "com.wizeman.proxicare"
     defaultConfig {
-        applicationId "com.wizeman.piolcare"
+        applicationId "com.wizeman.proxicare"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
+        versionCode 1
         versionName "1.0.1"
     }
     signingConfigs {
