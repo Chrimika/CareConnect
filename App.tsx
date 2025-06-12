@@ -25,6 +25,9 @@ import AddHospitalScreen from './screens/AddHospital'
 import AddMedecinScreen from './screens/AddMedecins';
 import MedecinScreen from './screens/MedecinScreen';
 import { HospitalListScreen } from './screens/Consultations';
+import ChatScreen from './screens/Chat';
+import HistoriqueConsultationsScreen from './screens/HistoriqueConsultations';
+import ConsultationDetailScreen from './screens/ConsultationDetail';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -287,9 +290,23 @@ const App = () => {
           component={ConsultationsScreen} 
           options={{ headerShown: false }} 
         />
-        
-        
+        <Stack.Screen 
+          name="Chat" 
+          component={ChatScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="HistoriqueConsultations" 
+          component={HistoriqueConsultationsScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="ConsultationDetail" 
+          component={ConsultationDetailScreen} 
+          options={{ headerShown: false }} 
+        />
       </Stack.Navigator>
+      
     </NavigationContainer>
   );
 };

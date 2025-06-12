@@ -10,16 +10,17 @@ import {
   ScrollView,
   Modal,
   TextInput,
-  Alert
+  Alert,
+  Pressable
 } from 'react-native';
 import Mapbox, { Camera, LineLayer, MapView, MarkerView, ShapeSource, SymbolLayer } from '@rnmapbox/maps';
 import Icon from 'react-native-vector-icons/Ionicons';
+import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from 'react-native-geolocation-service';
 import axios from 'axios';
 import { Calendar } from 'react-native-calendars';
-import auth from '@react-native-firebase/auth';
 import moment from 'moment';
 import 'moment/locale/fr';
 
@@ -37,6 +38,7 @@ const HospitalListScreen = ({ navigation }) => {
   const [currentHospitalIndex, setCurrentHospitalIndex] = useState(0);
   const [route, setRoute] = useState(null);
   const [distanceText, setDistanceText] = useState('');
+  const [consultCount, setConsultCount] = useState(0);
   
   const cameraRef = useRef(null);
   const mapRef = useRef(null);
@@ -96,6 +98,19 @@ const HospitalListScreen = ({ navigation }) => {
     };
 
     fetchData();
+  }, []);
+
+  // Consultations count effect
+  useEffect(() => {
+    const user = auth().currentUser;
+    if (!user) return;
+    const unsubscribe = firestore()
+      .collection('consultations')
+      .where('patientId', '==', user.uid)
+      .onSnapshot(snap => {
+        setConsultCount(snap.size);
+      });
+    return () => unsubscribe();
   }, []);
 
   // Calcul de distance haversine
@@ -201,14 +216,15 @@ const HospitalListScreen = ({ navigation }) => {
 
   // Rendu d'un hôpital dans la liste
   const renderHospitalItem = ({ item, index }) => (
-    <TouchableOpacity 
+    <Pressable 
       style={[
         styles.hospitalCard,
         index === currentHospitalIndex && styles.selectedHospitalCard
       ]}
       onPress={() => {
         setCurrentHospitalIndex(index);
-        centerOnHospital(item);
+        // Navigation vers la prise de rendez-vous avec l'hôpital sélectionné
+        navigation.navigate('PrendreRendezVous', { hospital: item });
       }}
     >
       {item.logo ? (
@@ -232,7 +248,7 @@ const HospitalListScreen = ({ navigation }) => {
       </View>
       
       <Icon name="chevron-forward" size={20} color="#09d1a0" />
-    </TouchableOpacity>
+    </Pressable>
   );
 
   if (loading) {
@@ -290,7 +306,7 @@ const HospitalListScreen = ({ navigation }) => {
                 coordinate={[hospital.location.longitude, hospital.location.latitude]}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
-                <TouchableOpacity onPress={() => {
+                <Pressable onPress={() => {
                   setCurrentHospitalIndex(index);
                   navigation.navigate('HospitalDetails', { hospital });
                 }}>
@@ -300,7 +316,7 @@ const HospitalListScreen = ({ navigation }) => {
                   ]}>
                     <Icon name="medical" size={16} color="white" />
                   </View>
-                </TouchableOpacity>
+                </Pressable>
                 
                 {/* Hospital Name Label */}
                 <SymbolLayer
@@ -335,20 +351,20 @@ const HospitalListScreen = ({ navigation }) => {
         </MapView>
         
         {/* Map Controls */}
-        <TouchableOpacity 
+        <Pressable
           style={[styles.mapButton, styles.targetButton]}
           onPress={centerOnUser}
         >
           <Icon name="locate" size={20} color="#09d1a0" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
+        </Pressable>
+
+        <Pressable
           style={[styles.mapButton, styles.nextButton]}
           onPress={goToNextHospital}
         >
           <Icon name="arrow-forward" size={20} color="#09d1a0" />
-        </TouchableOpacity>
-        
+        </Pressable>
+
         {distanceText && (
           <View style={styles.distanceBadge}>
             <Text style={styles.distanceText}>{distanceText}</Text>
@@ -366,6 +382,19 @@ const HospitalListScreen = ({ navigation }) => {
           <Text style={styles.emptyText}>Aucun hôpital trouvé</Text>
         }
       />
+
+      {/* Floating Action Button for Consultation History */}
+      <Pressable
+        style={styles.fab}
+        onPress={() => navigation.navigate('HistoriqueConsultations')}
+      >
+        <Icon name="time-outline" size={28} color="#fff" />
+        {consultCount > 0 && (
+          <View style={styles.fabBadge}>
+            <Text style={styles.fabBadgeText}>{consultCount}</Text>
+          </View>
+        )}
+      </Pressable>
     </View>
   );
 };
@@ -476,28 +505,26 @@ const styles = StyleSheet.create({
   },
   hospitalName: {
     fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 5,
+    fontFamily: 'UbuntuMono-Bold',
   },
   hospitalText: {
     fontSize: 14,
     color: '#666',
     marginLeft: 5,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 3,
+    fontFamily: 'UbuntuMono-Bold',
   },
   distanceText: {
     fontSize: 14,
     color: '#09d1a0',
     marginLeft: 5,
+    fontFamily: 'UbuntuMono-Bold',
   },
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
     color: '#666',
+    fontFamily: 'UbuntuMono-Bold',
   },
   // Styles pour HospitalDetailScreen
   backButton: {
@@ -524,7 +551,8 @@ const styles = StyleSheet.create({
   hospitalAddress: {
     fontSize: 14,
     color: '#666',
-    marginVertical:5
+    marginVertical:5,
+    fontFamily: 'UbuntuMono-Bold',
   },
   section: {
     padding: 15,
@@ -566,6 +594,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#f0f9f7',
     borderRadius: 8,
+    fontFamily: 'UbuntuMono-Bold',
   },
   timeSlot: {
     paddingHorizontal: 15,
@@ -580,6 +609,7 @@ const styles = StyleSheet.create({
   timeSlotText: {
     fontSize: 14,
     color: '#333',
+    fontFamily: 'UbuntuMono-Bold',
   },
   timeSlotsContainer: {
     paddingVertical: 10,
@@ -587,6 +617,7 @@ const styles = StyleSheet.create({
   noSlotsText: {
     color: '#666',
     fontStyle: 'italic',
+    fontFamily: 'UbuntuMono-Bold',
   },
   bookButton: {
     margin: 20,
@@ -599,6 +630,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    fontFamily: 'UbuntuMono-Bold',
   },
   modalContainer: {
     flex: 1,
@@ -617,11 +649,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+    fontFamily: 'UbuntuMono-Bold',
   },
   modalText: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,
+    fontFamily: 'UbuntuMono-Bold',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -637,6 +671,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#333',
+    fontFamily: 'UbuntuMono-Bold',
   },
   confirmButton: {
     flex: 1,
@@ -647,6 +682,7 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: '#fff',
+    fontFamily: 'UbuntuMono-Bold',
   },
   mapButton: {
     position: 'absolute',
@@ -686,6 +722,36 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     elevation: 3,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 30,
+    backgroundColor: '#09d1a0',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    zIndex: 10,
+  },
+  fabBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#e74c3c',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  fabBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   selectedHospitalMarker: {
     backgroundColor: '#ff6b6b',
@@ -747,11 +813,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
+    fontFamily: 'UbuntuMono-Bold',
   },
   specialty: {
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+    fontFamily: 'UbuntuMono-Bold',
   },
   modalOverlay: {
     flex: 1,
@@ -766,6 +834,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10,
     color: '#333',
+    fontFamily: 'UbuntuMono-Bold',
   },
   modalButton: {
     flex: 1,
@@ -777,6 +846,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
+    fontFamily: 'UbuntuMono-Bold',
   },
   doctorsScroll: {
     borderBottomWidth: 1,
@@ -801,9 +871,11 @@ const styles = StyleSheet.create({
   doctorFilterText: {
     fontSize: 14,
     color: '#666',
+    fontFamily: 'UbuntuMono-Bold',
   },
   selectedDoctorFilterText: {
     color: '#fff',
+    fontFamily: 'UbuntuMono-Bold',
   },
   calendarContainer: {
     backgroundColor: '#fff',
