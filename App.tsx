@@ -28,6 +28,7 @@ import { HospitalListScreen } from './screens/Consultations';
 import ChatScreen from './screens/Chat';
 import HistoriqueConsultationsScreen from './screens/HistoriqueConsultations';
 import ConsultationDetailScreen from './screens/ConsultationDetail';
+import PrendreRendezVousScreen from './screens/PrendreRendezVous';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -305,6 +306,12 @@ const App = () => {
           component={ConsultationDetailScreen} 
           options={{ headerShown: false }} 
         />
+        <Stack.Screen 
+          name="PrendreRendezVous" 
+          component={PrendreRendezVousScreen} 
+          options={{ headerShown: false }} 
+        />
+        
       </Stack.Navigator>
       
     </NavigationContainer>
