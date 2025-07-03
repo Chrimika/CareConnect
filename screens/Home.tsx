@@ -41,30 +41,32 @@ export default function HomeScreen() {
   
           if (user) {
             const uid = user.uid;
-  
             const positionData = { latitude, longitude };
-  
             try {
               // 🔁 Firestore : met à jour la position du user
               await firestore()
                 .collection('users')
                 .doc(uid)
                 .update({ position: positionData });
-  
               // 💾 AsyncStorage : stocke localement
               await AsyncStorage.setItem('user_position', JSON.stringify(positionData));
-  
               console.log('Position mise à jour en ligne et locale :', positionData);
             } catch (error) {
               console.error('Erreur de mise à jour de la position :', error);
             }
-  
             setLocation(positionData); // met à jour l’état local
           }
         },
         (error) => {
           console.log('Erreur de géolocalisation :', error);
-          alert('Impossible de récupérer la position.');
+          // Relancer la demande toutes les 3 secondes tant qu'on n'a pas la position
+          setTimeout(() => {
+            fetchLocation();
+          }, 3000);
+          Alert.alert(
+            "Localisation requise",
+            "Impossible de récupérer la position. Merci d'activer la localisation pour utiliser l'application."
+          );
         },
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
       );
@@ -102,7 +104,7 @@ export default function HomeScreen() {
       <StatusBar translucent backgroundColor={'transparent'} barStyle={'light-content'} />
       
       <ImageBackground source={require('../assets/images/bg-wave.png')} resizeMode='repeat' style={{width:'100%',flex:0.35}}>
-        <View style={{padding:16, justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95'}}>
+        <View style={{padding:16, justifyContent:'space-between',flexDirection:'row',width:'100%',borderWidth:1,borderColor:'#0bcb95',marginTop:15}}>
           <TouchableOpacity onPress={()=>({})}>
             <Image source={require('../assets/images/logo.png')} style={{width:40,height:40}}/>
           </TouchableOpacity>
@@ -142,7 +144,7 @@ export default function HomeScreen() {
           <ImageBackground resizeMode='contain' source={require('../assets/images/doctorHero.png')} style={{flex:0.6}}></ImageBackground>
           <View style={{flex:0.4,paddingHorizontal:15,justifyContent:'center'}}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('ListHosto')}
+              onPress={() => navigation.navigate('Consultations')}
               style={{ backgroundColor: '#0bcb95', width: '100%', padding: 10, borderRadius: 15 }}
             >
               <Text style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 18, color: '#fff',fontFamily:'Poppins Medium' }}>Consulter</Text>

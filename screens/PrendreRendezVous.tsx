@@ -1,47 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView,StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Pressable } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  StyleSheet, 
+  TouchableOpacity, 
+  FlatList, 
+  ActivityIndicator, 
+  Alert, 
+  Pressable, 
+  Image,
+  Dimensions 
+} from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import { Calendar } from 'react-native-calendars';
 import { Picker } from '@react-native-picker/picker';
 
-export default function PrendreRendezVousScreen({ navigation, route }) {
-  const [hospitals, setHospitals] = useState([]);
-  const [selectedHospital, setSelectedHospital] = useState(null);
+const { width } = Dimensions.get('window');
 
+export default function PrendreRendezVousScreen({ navigation, route }) {
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
-
   const [selectedDate, setSelectedDate] = useState(null);
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState(null);
-
   const [loading, setLoading] = useState(false);
-
   const [selectedSpecialite, setSelectedSpecialite] = useState('');
   const [specialites, setSpecialites] = useState([]);
+  const [currentStep, setCurrentStep] = useState(1);
 
-  // Charger les hôpitaux
-  useEffect(() => {
-    const fetchHospitals = async () => {
-      setLoading(true);
-      const snap = await firestore().collection('hospitals').get();
-      setHospitals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    };
-    fetchHospitals();
-  }, []);
+  // Refs pour le scroll automatique
+  const scrollViewRef = useRef(null);
+  const stepRefs = useRef({});
+
+  const hospital = route?.params?.hospital;
 
   // Charger les médecins de l'hôpital sélectionné
   useEffect(() => {
-    if (!selectedHospital) return;
+    if (!hospital) return;
     setSelectedDoctor(null);
     setDoctors([]);
     setSelectedDate(null);
     setSlots([]);
+    setCurrentStep(1);
+    
     const fetchDoctors = async () => {
       setLoading(true);
-      const hosp = await firestore().collection('hospitals').doc(selectedHospital.id).get();
+      const hosp = await firestore().collection('hospitals').doc(hospital.id).get();
       const medecinsIds = hosp.data()?.medecins || [];
       if (medecinsIds.length === 0) {
         setDoctors([]);
@@ -56,7 +62,7 @@ export default function PrendreRendezVousScreen({ navigation, route }) {
       setLoading(false);
     };
     fetchDoctors();
-  }, [selectedHospital]);
+  }, [hospital]);
 
   // Met à jour la liste des spécialités quand les médecins changent
   useEffect(() => {
@@ -70,65 +76,37 @@ export default function PrendreRendezVousScreen({ navigation, route }) {
     setSelectedSpecialite('');
   }, [doctors]);
 
-  // Charger les créneaux pour le médecin et la date sélectionnés
+  // Charger les plages réservées pour le médecin et la date sélectionnés
   useEffect(() => {
     if (!selectedDoctor || !selectedDate) return;
     setSlots([]);
-    const fetchSlots = async () => {
+    const fetchReservedPlages = async () => {
       setLoading(true);
       try {
-        // 1. Trouver le jour de la semaine (fr)
-        const jours = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
-        const dayName = jours[new Date(selectedDate).getDay()];
-
-        // 2. Récupérer le document "jour"
-        const jourSnap = await firestore()
-          .collection('jours')
-          .where('nom', '==', dayName)
-          .limit(1)
-          .get();
-        if (jourSnap.empty) {
-          setSlots([]);
-          setLoading(false);
-          return;
-        }
-        const jourDoc = jourSnap.docs[0];
-        const jourId = jourDoc.id;
-
-        // 3. Récupérer les plages horaires de ce jour
         const plagesSnap = await firestore()
-          .collection('plageHoraires')
-          .where('id_jour', '==', jourId)
-          .get();
-        const plages = plagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // 4. Vérifier les consultations déjà prises pour ce médecin, ce jour, cette date
-        const consultSnap = await firestore()
-          .collection('consultations')
+          .collection('plannings')
           .where('doctorId', '==', selectedDoctor.id)
           .where('date', '==', selectedDate)
+          .where('status', '==', 'reserved')
           .get();
-        const plagesReservees = consultSnap.docs.map(doc => doc.data().plageId);
 
-        // 5. Formater les slots pour l'affichage
-        const slots = plages.map(pl => ({
-          id: pl.id,
-          heureDebut: pl.heureDebut,
-          heureFin: pl.heureFin,
-          time: `${pl.heureDebut} - ${pl.heureFin}`,
-          status: plagesReservees.includes(pl.id) ? 'reserved' : 'available',
+        const plages = plagesSnap.docs.map(doc => ({
+          id: doc.id,
+          heureDebut: doc.data().time,
+          heureFin: null,
+          time: doc.data().time,
+          status: 'reserved',
         }));
 
-        setSlots(slots);
+        setSlots(plages);
       } catch (e) {
         setSlots([]);
       }
       setLoading(false);
     };
-    fetchSlots();
+    fetchReservedPlages();
   }, [selectedDoctor, selectedDate]);
 
-  // Prendre rendez-vous
   const handleBookConsultation = async (plage) => {
     try {
       setLoading(true);
@@ -139,34 +117,40 @@ export default function PrendreRendezVousScreen({ navigation, route }) {
         return;
       }
 
-      // Vérifie si la plage est déjà réservée (optionnel)
-      const plageDoc = await firestore().collection('plageHoraires').doc(plage.id).get();
-      if (plageDoc.data()?.reserved) {
+      const existing = await firestore()
+        .collection('consultations')
+        .where('doctorId', '==', selectedDoctor.id)
+        .where('date', '==', selectedDate)
+        .where('heureDebut', '==', plage.time)
+        .get();
+
+      if (!existing.empty) {
         Alert.alert('Ce créneau vient d\'être réservé');
         setLoading(false);
         return;
       }
 
-      // Crée la consultation
-      const consultationRef = await firestore().collection('consultations').add({
+      const duration = hospital?.consultationDuration || 30;
+      const [h, m] = plage.time.split(':').map(Number);
+      const startDate = new Date(0, 0, 0, h, m);
+      const endDate = new Date(startDate.getTime() + duration * 60000);
+      const endHour = endDate.getHours().toString().padStart(2, '0');
+      const endMin = endDate.getMinutes().toString().padStart(2, '0');
+      const heureFin = `${endHour}:${endMin}`;
+
+      await firestore().collection('consultations').add({
         patientId: user.uid,
         patientName: user.displayName || '',
         doctorId: selectedDoctor.id,
         doctorName: `${selectedDoctor.prenom} ${selectedDoctor.nom}`,
-        hospitalId: selectedHospital.id,
-        hospitalName: selectedHospital.name,
+        hospitalId: hospital.id,
+        hospitalName: hospital.name,
         date: selectedDate,
-        heureDebut: plage.heureDebut,
-        heureFin: plage.heureFin,
+        heureDebut: plage.time,
+        heureFin: heureFin,
         plageId: plage.id,
         status: 'confirmed',
         createdAt: firestore.FieldValue.serverTimestamp(),
-      });
-
-      // Marque la plage comme réservée (optionnel)
-      await firestore().collection('plageHoraires').doc(plage.id).update({
-        reserved: true,
-        consultationId: consultationRef.id,
       });
 
       Alert.alert('Succès', 'Votre rendez-vous est confirmé !', [
@@ -178,230 +162,654 @@ export default function PrendreRendezVousScreen({ navigation, route }) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (route?.params?.hospital) {
-      setSelectedHospital(route.params.hospital);
-    }
-  }, [route?.params?.hospital]);
-
-  // Filtre les médecins selon la spécialité choisie
   const filteredDoctors = selectedSpecialite
     ? doctors.filter(d => d.specialite === selectedSpecialite)
     : doctors;
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Prendre rendez-vous</Text>
-      {/* 1. Choix de l'hôpital */}
-      <View>
-        <Text style={styles.label}>Choisissez un hôpital</Text>
-        <FlatList
-          data={hospitals}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[
-          styles.chip,
-          selectedHospital?.id === item.id && styles.chipSelected
-              ]}
-              onPress={() => setSelectedHospital(item)}
-            >
-              <Text style={{ color: selectedHospital?.id === item.id ? '#fff' : '#09d1a0' }}>
-          {item.name}
-              </Text>
-            </Pressable>
-          )}
-          contentContainerStyle={{ marginBottom: 2 }} // Réduit l'espacement ici
-        />
+  // Fonction pour scroller automatiquement vers la prochaine étape
+  const scrollToStep = (step) => {
+    const stepKey = `step${step}`;
+    if (stepRefs.current[stepKey] && scrollViewRef.current) {
+      setTimeout(() => {
+        stepRefs.current[stepKey].measureLayout(
+          scrollViewRef.current,
+          (x, y) => {
+            scrollViewRef.current.scrollTo({ 
+              y: y - 60, // Offset pour laisser de l'espace en haut
+              animated: true 
+            });
+          },
+          () => {} // Error callback
+        );
+      }, 300); // Petit délai pour laisser le temps au render
+    }
+  };
+
+  const handleDoctorSelect = (doctor) => {
+    setSelectedDoctor(doctor);
+    setSelectedDate(null);
+    setSlots([]);
+    setSelectedSlot(null);
+    setCurrentStep(2);
+    scrollToStep(2);
+  };
+
+  const handleDateSelect = (day) => {
+    setSelectedDate(day.dateString);
+    setSelectedSlot(null);
+    setCurrentStep(3);
+    scrollToStep(3);
+  };
+
+  const handleSlotSelect = (slot) => {
+    setSelectedSlot(slot);
+    setCurrentStep(4);
+    scrollToStep(4);
+  };
+
+  const ProgressIndicator = () => (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressBar}>
+        <View style={[styles.progressStep, currentStep >= 1 && styles.progressStepActive]}>
+          <Text style={[styles.progressText, currentStep >= 1 && styles.progressTextActive]}>1</Text>
+        </View>
+        <View style={[styles.progressLine, currentStep >= 2 && styles.progressLineActive]} />
+        <View style={[styles.progressStep, currentStep >= 2 && styles.progressStepActive]}>
+          <Text style={[styles.progressText, currentStep >= 2 && styles.progressTextActive]}>2</Text>
+        </View>
+        <View style={[styles.progressLine, currentStep >= 3 && styles.progressLineActive]} />
+        <View style={[styles.progressStep, currentStep >= 3 && styles.progressStepActive]}>
+          <Text style={[styles.progressText, currentStep >= 3 && styles.progressTextActive]}>3</Text>
+        </View>
+        <View style={[styles.progressLine, currentStep >= 4 && styles.progressLineActive]} />
+        <View style={[styles.progressStep, currentStep >= 4 && styles.progressStepActive]}>
+          <Text style={[styles.progressText, currentStep >= 4 && styles.progressTextActive]}>4</Text>
+        </View>
       </View>
-      
+      <View style={styles.progressLabels}>
+        <Text style={styles.progressLabel}>Médecin</Text>
+        <Text style={styles.progressLabel}>Date</Text>
+        <Text style={styles.progressLabel}>Créneau</Text>
+        <Text style={styles.progressLabel}>Confirmer</Text>
+      </View>
+    </View>
+  );
 
-      {/* 2. Choix du médecin */}
-      {selectedHospital && (
-        <>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5, marginTop: 10 }}>
-            <Text style={styles.label}>Choisissez un médecin</Text>
-            {specialites.length > 1 && (
-              <Picker
-                selectedValue={selectedSpecialite}
-                onValueChange={setSelectedSpecialite}
-                style={{ height: 30, width: 160, marginLeft: 10 }}
-                mode="dropdown"
-                dropdownIconColor="#09d1a0"
-              >
-                <Picker.Item label="Toutes spécialités" value="" />
-                {specialites.map(s => (
-                  <Picker.Item key={s} label={s} value={s} />
-                ))}
-              </Picker>
-            )}
-          </View>
-          <FlatList
-            data={filteredDoctors}
-            horizontal
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.chip,
-                  selectedDoctor?.id === item.id && styles.chipSelected,
-                  !selectedHospital && { opacity: 0.5 }
-                ]}
-                onPress={() => selectedHospital && setSelectedDoctor(item)}
-                disabled={!selectedHospital}
-              >
-                <Text style={{ color: selectedDoctor?.id === item.id ? '#fff' : '#09d1a0' }}>
-                  Dr {item.prenom} {item.nom}
-                </Text>
-              </TouchableOpacity>
-            )}
-            contentContainerStyle={{ marginBottom: 10 }}
+  const HospitalCard = () => (
+    <View style={styles.hospitalCard}>
+      <View style={styles.hospitalHeader}>
+        {hospital?.logo && (
+          <Image
+            source={{ uri: hospital.logo }}
+            style={styles.hospitalLogo}
+            resizeMode="contain"
           />
-        </>
-      )}
-
-      {/* 3. Choix de la date */}
-      {selectedDoctor && (
-        <>
-          <Text style={styles.label}>Choisissez une date</Text>
-          <Calendar
-            onDayPress={day => setSelectedDate(day.dateString)}
-            markedDates={selectedDate ? { [selectedDate]: { selected: true, selectedColor: '#09d1a0' } } : {}}
-            minDate={new Date().toISOString().split('T')[0]}
-            style={{ marginBottom: 10 }}
-          />
-        </>
-      )}
-
-      {/* 4. Choix du créneau */}
-      {selectedDate && (
-        <>
-          <Text style={styles.label}>Choisissez un créneau</Text>
-          {loading ? (
-            <ActivityIndicator color="#09d1a0" />
-          ) : slots.length === 0 ? (
-            <Text style={{ color: 'gray', marginBottom: 10 }}>Aucun créneau ce jour</Text>
-          ) : (
-            <FlatList
-              style={{ marginBottom: 15 }}
-              data={slots}
-              numColumns={2}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => {
-                const isAvailable = item.status === 'available';
-                const isSelected = selectedSlot?.id === item.id;
-                return (
-                  <Pressable
-                    style={[
-                      styles.slot,
-                      isSelected && styles.slotSelected,
-                      !isAvailable && styles.slotDisabled
-                    ]}
-                    onPress={() => isAvailable && setSelectedSlot(item)}
-                    disabled={!isAvailable}
-                  >
-                    <Text style={{
-                      color: isAvailable ? (isSelected ? '#fff' : '#09d1a0') : '#aaa',
-                      fontWeight: 'bold',
-                      fontSize: 16,
-                    }}>
-                      {item.time}
-                    </Text>
-                    <Text style={{
-                      color: isAvailable ? (isSelected ? '#fff' : '#09d1a0') : '#aaa',
-                      fontSize: 12,
-                      marginTop: 4,
-                    }}>
-                      {isAvailable ? 'Disponible' : 'Réservé'}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-              contentContainerStyle={{ marginBottom: 10 }}
-            />
+        )}
+        <View style={styles.hospitalInfo}>
+          <Text style={styles.hospitalName}>{hospital?.name}</Text>
+          {hospital?.address && (
+            <Text style={styles.hospitalAddress}>📍 {hospital.address}</Text>
           )}
-        </>
-      )}
+        </View>
+      </View>
+    </View>
+  );
 
-      {/* 5. Résumé du rendez-vous */}
-      {selectedSlot && (
-        <View style={{
-          backgroundColor: '#f0f9f7',
-          borderRadius: 8,
-          padding: 12,
-          marginVertical: 10,
-          borderWidth: 1,
-          borderColor: '#09d1a0'
-        }}>
-          <Text style={{ fontWeight: 'bold', color: '#09d1a0', marginBottom: 4 }}>Résumé du rendez-vous :</Text>
-          <Text>Médecin : Dr {selectedDoctor.prenom} {selectedDoctor.nom}</Text>
-          <Text>Date : {selectedDate}</Text>
-          <Text>Créneau : {selectedSlot.time}</Text>
+  const DoctorSelection = () => (
+    <View 
+      style={styles.stepContainer}
+      ref={ref => stepRefs.current.step1 = ref}
+    >
+      <Text style={styles.stepTitle}>👨‍⚕️ Choisissez votre médecin</Text>
+      
+      {specialites.length > 1 && (
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Filtrer par spécialité :</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedSpecialite}
+              onValueChange={setSelectedSpecialite}
+              style={styles.picker}
+              dropdownIconColor="#09d1a0"
+            >
+              <Picker.Item label="Toutes les spécialités" value="" />
+              {specialites.map(s => (
+                <Picker.Item key={s} label={s} value={s} />
+              ))}
+            </Picker>
+          </View>
         </View>
       )}
 
-      {/* 6. Bouton de confirmation */}
-      {selectedSlot && (
+      <FlatList
+        data={filteredDoctors}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.doctorCard,
+              selectedDoctor?.id === item.id && styles.doctorCardSelected,
+            ]}
+            onPress={() => handleDoctorSelect(item)}
+          >
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>Dr {item.prenom} {item.nom}</Text>
+              <Text style={styles.doctorSpecialty}>{item.specialite}</Text>
+            </View>
+            <View style={styles.doctorIcon}>
+              <Text style={styles.doctorIconText}>👨‍⚕️</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+
+  const DateSelection = () => (
+    selectedDoctor && (
+      <View 
+        style={styles.stepContainer}
+        ref={ref => stepRefs.current.step2 = ref}
+      >
+        <Text style={styles.stepTitle}>📅 Choisissez une date</Text>
+        <View style={styles.calendarContainer}>
+          <Calendar
+            onDayPress={handleDateSelect}
+            markedDates={selectedDate ? { [selectedDate]: { selected: true, selectedColor: '#09d1a0' } } : {}}
+            minDate={new Date().toISOString().split('T')[0]}
+            theme={{
+              backgroundColor: '#ffffff',
+              calendarBackground: '#ffffff',
+              textSectionTitleColor: '#09d1a0',
+              selectedDayBackgroundColor: '#09d1a0',
+              selectedDayTextColor: '#ffffff',
+              todayTextColor: '#09d1a0',
+              dayTextColor: '#2d4150',
+              textDisabledColor: '#d9e1e8',
+              arrowColor: '#09d1a0',
+              monthTextColor: '#09d1a0',
+              textDayFontWeight: '500',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '600',
+              textDayFontSize: 16,
+              textMonthFontSize: 18,
+              textDayHeaderFontSize: 14
+            }}
+          />
+        </View>
+      </View>
+    )
+  );
+
+  const SlotSelection = () => (
+    selectedDate && (
+      <View 
+        style={styles.stepContainer}
+        ref={ref => stepRefs.current.step3 = ref}
+      >
+        <Text style={styles.stepTitle}>⏰ Créneaux disponibles</Text>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#09d1a0" />
+            <Text style={styles.loadingText}>Chargement des créneaux...</Text>
+          </View>
+        ) : slots.length === 0 ? (
+          <View style={styles.noSlotsContainer}>
+            <Text style={styles.noSlotsText}>😔 Aucun créneau disponible ce jour</Text>
+            <Text style={styles.noSlotsSubtext}>Veuillez choisir une autre date</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={slots}
+            keyExtractor={item => item.id}
+            numColumns={2}
+            renderItem={({ item }) => {
+              const duration = hospital?.consultationDuration || 30;
+              const [h, m] = item.time.split(':').map(Number);
+              const startDate = new Date(0, 0, 0, h, m);
+              const endDate = new Date(startDate.getTime() + duration * 60000);
+              const endHour = endDate.getHours().toString().padStart(2, '0');
+              const endMin = endDate.getMinutes().toString().padStart(2, '0');
+              const plageText = `${item.time} - ${endHour}:${endMin}`;
+
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.slotCard,
+                    selectedSlot?.id === item.id && styles.slotCardSelected,
+                  ]}
+                  onPress={() => handleSlotSelect(item)}
+                >
+                  <Text style={[
+                    styles.slotTime,
+                    selectedSlot?.id === item.id && styles.slotTimeSelected
+                  ]}>
+                    {plageText}
+                  </Text>
+                  <Text style={[
+                    styles.slotStatus,
+                    selectedSlot?.id === item.id && styles.slotStatusSelected
+                  ]}>
+                    {selectedSlot?.id === item.id ? '✓ Sélectionné' : '🕐 Disponible'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    )
+  );
+
+  const Summary = () => (
+    selectedSlot && (
+      <View 
+        style={styles.stepContainer}
+        ref={ref => stepRefs.current.step4 = ref}
+      >
+        <Text style={styles.stepTitle}>📋 Résumé de votre rendez-vous</Text>
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>👨‍⚕️ Médecin</Text>
+            <Text style={styles.summaryValue}>Dr {selectedDoctor.prenom} {selectedDoctor.nom}</Text>
+            <Text style={styles.summarySubValue}>{selectedDoctor.specialite}</Text>
+          </View>
+          
+          <View style={styles.summaryDivider} />
+          
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>📅 Date</Text>
+            <Text style={styles.summaryValue}>{selectedDate}</Text>
+          </View>
+          
+          <View style={styles.summaryDivider} />
+          
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>⏰ Créneau</Text>
+            <Text style={styles.summaryValue}>{selectedSlot.time}</Text>
+          </View>
+          
+          <View style={styles.summaryDivider} />
+          
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>🏥 Hôpital</Text>
+            <Text style={styles.summaryValue}>{hospital.name}</Text>
+          </View>
+        </View>
+
         <Pressable
-          style={styles.bookBtn}
+          style={styles.confirmButton}
           onPress={() => handleBookConsultation(selectedSlot)}
           disabled={loading}
         >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-            Confirmer le rendez-vous
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.confirmButtonText}>✓ Confirmer le rendez-vous</Text>
+          )}
         </Pressable>
-      )}
+      </View>
+    )
+  );
 
-      {loading && <ActivityIndicator color="#09d1a0" style={{ marginTop: 10 }} />}
-    </ScrollView>
+  return (
+    <View style={styles.container}>
+      {/* Header fixe avec le stepper */}
+      <View style={styles.fixedHeader}>
+        <Text style={styles.title}>Prendre rendez-vous</Text>
+        <ProgressIndicator />
+      </View>
+
+      {/* Contenu scrollable */}
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContentContainer}
+      >
+        <HospitalCard />
+        <DoctorSelection />
+        <DateSelection />
+        <SlotSelection />
+        <Summary />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff',paddingBottom:40 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#000', marginBottom: 20,marginTop:20 },
-  label: { fontWeight: 'bold', color: '#333', marginBottom: 5, marginTop: 10 },
-  chip: {
-    borderWidth: 1,
-    borderColor: '#09d1a0',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 10,
-    backgroundColor: '#fff',
-    maxHeight: 40,
-  },
-  chipSelected: {
-    backgroundColor: '#09d1a0',
-    borderColor: '#09d1a0',
-  },
-  slot: {
+  container: {
     flex: 1,
-    margin: 5,
-    padding: 16,
+    backgroundColor: '#f8fafa',
+  },
+  
+  // Header fixe
+  fixedHeader: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f1ef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  
+  // Contenu scrollable
+  scrollContent: {
+    flex: 1,
+  },
+  
+  scrollContentContainer: {
+    paddingBottom: 30,
+  },
+  
+  header: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f1ef',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#09d1a0',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  
+  // Progress Indicator
+  progressContainer: {
+    marginBottom: 10,
+  },
+  progressBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  progressStep: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#e8f1ef',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#e8f1ef',
+  },
+  progressStepActive: {
+    backgroundColor: '#09d1a0',
+    borderColor: '#09d1a0',
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#999',
+  },
+  progressTextActive: {
+    color: '#fff',
+  },
+  progressLine: {
+    width: 40,
+    height: 2,
+    backgroundColor: '#e8f1ef',
+  },
+  progressLineActive: {
+    backgroundColor: '#09d1a0',
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+
+  // Hospital Card
+  hospitalCard: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  hospitalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hospitalLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+  },
+  hospitalInfo: {
+    flex: 1,
+  },
+  hospitalName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#09d1a0',
+    marginBottom: 5,
+  },
+  hospitalAddress: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+
+  // Step Container
+  stepContainer: {
+    backgroundColor: '#fff',
+    margin: 20,
+    marginTop: 10,
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stepTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+  },
+
+  // Filter
+  filterContainer: {
+    marginBottom: 20,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 10,
+  },
+  pickerContainer: {
+    backgroundColor: '#f8fafa',
     borderRadius: 10,
     borderWidth: 1,
+    borderColor: '#e8f1ef',
+  },
+  picker: {
+    height: 50,
+  },
+
+  // Doctor Cards
+  doctorCard: {
+    backgroundColor: '#f8fafa',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e8f1ef',
+  },
+  doctorCardSelected: {
+    backgroundColor: '#e8f5f1',
     borderColor: '#09d1a0',
+  },
+  doctorInfo: {
+    flex: 1,
+  },
+  doctorName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  doctorSpecialty: {
+    fontSize: 14,
+    color: '#666',
+  },
+  doctorIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#09d1a0',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    marginBottom:10
+    justifyContent: 'center',
   },
-  slotSelected: {
-    backgroundColor: '#09d1a0',
+  doctorIconText: {
+    fontSize: 20,
   },
-  slotDisabled: {
-    backgroundColor: '#eee',
-    borderColor: '#ccc',
-  },
-  bookBtn: {
-    backgroundColor: '#09d1a0',
-    padding: 16,
+
+  // Calendar
+  calendarContainer: {
     borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e8f1ef',
+  },
+
+  // Slots
+  slotCard: {
+    flex: 1,
+    backgroundColor: '#f8fafa',
+    borderRadius: 12,
+    padding: 15,
+    margin: 5,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e8f1ef',
+    minHeight: 80,
+    justifyContent: 'center',
+  },
+  slotCardSelected: {
+    backgroundColor: '#e8f5f1',
+    borderColor: '#09d1a0',
+  },
+  slotTime: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  slotTimeSelected: {
+    color: '#09d1a0',
+  },
+  slotStatus: {
+    fontSize: 12,
+    color: '#666',
+  },
+  slotStatusSelected: {
+    color: '#09d1a0',
+  },
+
+  // Loading and No Slots
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
     marginTop: 10,
-    marginBottom:30
+  },
+  noSlotsContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  noSlotsText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  noSlotsSubtext: {
+    fontSize: 14,
+    color: '#999',
+  },
+
+  // Summary
+  summaryCard: {
+    backgroundColor: '#f8fafa',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e8f1ef',
+  },
+  summaryItem: {
+    paddingVertical: 10,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 5,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  summarySubValue: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#e8f1ef',
+    marginVertical: 5,
+  },
+
+  // Confirm Button
+  confirmButton: {
+    backgroundColor: '#09d1a0',
+    borderRadius: 12,
+    padding: 18,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#09d1a0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

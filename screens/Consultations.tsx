@@ -3,15 +3,16 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   TouchableOpacity, 
   Image, 
   ActivityIndicator,
-  ScrollView,
-  Modal,
   TextInput,
   Alert,
-  Pressable
+  Pressable,
+  Animated,
+  Dimensions,
+  PanResponder,
+  ScrollView
 } from 'react-native';
 import Mapbox, { Camera, LineLayer, MapView, MarkerView, ShapeSource, SymbolLayer } from '@rnmapbox/maps';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -26,6 +27,9 @@ import 'moment/locale/fr';
 
 moment.locale('fr');
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BOTTOM_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
+
 // Configuration Mapbox
 Mapbox.setAccessToken('pk.eyJ1IjoibWlrYS1tYmEiLCJhIjoiY21heDI1ZjlpMDFmNjJrcHJmemI1cHl1bSJ9.X0S79u0BD7Xn2WIJypQWsg');
 
@@ -35,13 +39,38 @@ const HospitalListScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentHospitalIndex, setCurrentHospitalIndex] = useState(0);
+  const [selectedHospital, setSelectedHospital] = useState(null);
   const [route, setRoute] = useState(null);
   const [distanceText, setDistanceText] = useState('');
   const [consultCount, setConsultCount] = useState(0);
   
   const cameraRef = useRef(null);
   const mapRef = useRef(null);
+  
+  // Animation pour le bottom sheet
+  const bottomSheetAnim = useRef(new Animated.Value(BOTTOM_SHEET_HEIGHT)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // PanResponder pour gérer le glissement du bottom sheet
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dy) > 20;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (gestureState.dy > 0) {
+          bottomSheetAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy > BOTTOM_SHEET_HEIGHT * 0.3) {
+          hideBottomSheet();
+        } else {
+          showBottomSheet();
+        }
+      },
+    })
+  ).current;
 
   // Récupérer la position et les hôpitaux
   useEffect(() => {
@@ -84,9 +113,14 @@ const HospitalListScreen = ({ navigation }) => {
             setSortedHospitals(sorted);
             setLoading(false);
 
-            // Center on nearest hospital if available
-            if (sorted.length > 0 && cameraRef.current) {
-              centerOnHospital(sorted[0]);
+            // Set initial camera position with 3km zoom
+            if (cameraRef.current) {
+              cameraRef.current.setCamera({
+                centerCoordinate: [longitude, latitude],
+                zoomLevel: 13.5, // Approximativement 3km de rayon
+                animationMode: 'flyTo',
+                animationDuration: 2000,
+              });
             }
           });
 
@@ -126,15 +160,39 @@ const HospitalListScreen = ({ navigation }) => {
     return R * c;
   };
 
-  // Centrer sur un hôpital spécifique
-  const centerOnHospital = (hospital) => {
-    if (!hospital?.location || !cameraRef.current) return;
-    
-    cameraRef.current.setCamera({
-      centerCoordinate: [hospital.location.longitude, hospital.location.latitude],
-      zoomLevel: 15,
-      animationMode: 'flyTo',
-      animationDuration: 2000,
+  // Afficher le bottom sheet
+  const showBottomSheet = () => {
+    Animated.parallel([
+      Animated.timing(bottomSheetAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0.5,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Masquer le bottom sheet
+  const hideBottomSheet = () => {
+    Animated.parallel([
+      Animated.timing(bottomSheetAnim, {
+        toValue: BOTTOM_SHEET_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setSelectedHospital(null);
+      setRoute(null);
+      setDistanceText('');
     });
   };
 
@@ -145,7 +203,7 @@ const HospitalListScreen = ({ navigation }) => {
       const endCoords = `${end[0]},${end[1]}`;
       
       const response = await axios.get(
-        `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoords};${endCoords}?geometries=geojson&access_token=${MAPBOX_ACCESS_TOKEN}`
+        `https://api.mapbox.com/directions/v5/mapbox/walking/${startCoords};${endCoords}?geometries=geojson&access_token=pk.eyJ1IjoibWlrYS1tYmEiLCJhIjoiY21heDI1ZjlpMDFmNjJrcHJmemI1cHl1bSJ9.X0S79u0BD7Xn2WIJypQWsg`
       );
       
       if (response.data?.routes?.[0]) {
@@ -161,22 +219,26 @@ const HospitalListScreen = ({ navigation }) => {
     return null;
   };
 
-  // Navigation vers le prochain hôpital
-  const goToNextHospital = async () => {
-    if (!sortedHospitals.length || !userLocation) return;
-    
-    const newIndex = (currentHospitalIndex + 1) % sortedHospitals.length;
-    const hospital = sortedHospitals[newIndex];
-    setCurrentHospitalIndex(newIndex);
-    
-    // Center on hospital
-    centerOnHospital(hospital);
-    
-    // Calculate route
+  // Gérer la sélection d'un hôpital
+  const handleHospitalPress = async (hospital) => {
+    setSelectedHospital(hospital);
+    showBottomSheet();
+
+    // Centrer la carte sur l'hôpital
+    if (hospital.location && cameraRef.current) {
+      cameraRef.current.setCamera({
+        centerCoordinate: [hospital.location.longitude, hospital.location.latitude],
+        zoomLevel: 15,
+        animationMode: 'flyTo',
+        animationDuration: 1000,
+      });
+    }
+
+    // Calculer l'itinéraire
     if (userLocation && hospital.location) {
       const routeData = await getRealRoute(
         [userLocation.longitude, userLocation.latitude],
-        [hospital.location.longitude, hospital.location.longitude]
+        [hospital.location.longitude, hospital.location.latitude]
       );
       
       if (routeData) {
@@ -199,56 +261,23 @@ const HospitalListScreen = ({ navigation }) => {
 
   // Recentrer sur la position utilisateur
   const centerOnUser = () => {
-    if (!userLocation || !cameraRef.current) return;
-    
+    if (!userLocation || !cameraRef.current) {
+      Alert.alert('Position non disponible', 'Impossible de recentrer sur votre position.');
+      return;
+    }
+
     cameraRef.current.setCamera({
       centerCoordinate: [userLocation.longitude, userLocation.latitude],
-      zoomLevel: 15,
+      zoomLevel: 13.5,
       animationMode: 'flyTo',
       animationDuration: 1000,
     });
-    
-    // Reset to nearest hospital
-    if (sortedHospitals.length > 0) {
-      setCurrentHospitalIndex(0);
-    }
   };
 
-  // Rendu d'un hôpital dans la liste
-  const renderHospitalItem = ({ item, index }) => (
-    <Pressable 
-      style={[
-        styles.hospitalCard,
-        index === currentHospitalIndex && styles.selectedHospitalCard
-      ]}
-      onPress={() => {
-        setCurrentHospitalIndex(index);
-        // Navigation vers la prise de rendez-vous avec l'hôpital sélectionné
-        navigation.navigate('PrendreRendezVous', { hospital: item });
-      }}
-    >
-      {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.hospitalLogo} />
-      ) : (
-        <View style={styles.hospitalLogoPlaceholder}>
-          <Icon name="medical" size={24} color="#fff" />
-        </View>
-      )}
-      
-      <View style={styles.hospitalInfo}>
-        <Text style={styles.hospitalName}>{item.name}</Text>
-        <Text style={styles.hospitalAddress}>
-          <Icon name="location" size={12} color="#666" /> {item.address}
-        </Text>
-        {item.distance && (
-          <Text style={styles.hospitalDistance}>
-            <Icon name="walk" size={12} color="#666" /> {item.distance.toFixed(1)} km
-          </Text>
-        )}
-      </View>
-      
-      <Icon name="chevron-forward" size={20} color="#09d1a0" />
-    </Pressable>
+  // Filtrer les hôpitaux selon la recherche
+  const filteredHospitals = sortedHospitals.filter(hospital =>
+    hospital.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    hospital.address?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -261,7 +290,73 @@ const HospitalListScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
+      {/* Map Container - Plein écran */}
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        styleURL={'mapbox://styles/mapbox/streets-v11'}
+        rotateEnabled={false}
+        pitchEnabled={false}
+        logoEnabled={false}
+        attributionEnabled={false}
+      >
+        <Camera
+          ref={cameraRef}
+          zoomLevel={13.5}
+          centerCoordinate={
+            userLocation
+              ? [userLocation.longitude, userLocation.latitude]
+              : [0, 0]
+          }
+        />
+
+        {/* User Location Marker */}
+        {userLocation && (
+          <MarkerView coordinate={[userLocation.longitude, userLocation.latitude]}>
+            <View style={styles.userMarker}>
+              <View style={styles.userMarkerInner} />
+            </View>
+          </MarkerView>
+        )}
+
+        {/* Hospitals Markers */}
+        {filteredHospitals.map((hospital) =>
+          hospital.location ? (
+            <MarkerView
+              key={hospital.id}
+              coordinate={[hospital.location.longitude, hospital.location.latitude]}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <Pressable onPress={() => handleHospitalPress(hospital)}>
+                <View
+                  style={[
+                    styles.hospitalMarker,
+                    selectedHospital?.id === hospital.id && styles.selectedHospitalMarker,
+                  ]}
+                >
+                  <Icon name="medical" size={16} color="white" />
+                </View>
+              </Pressable>
+            </MarkerView>
+          ) : null
+        )}
+
+        {/* Route Layer */}
+        {route && (
+          <ShapeSource id="routeSource" shape={route}>
+            <LineLayer
+              id="routeLayer"
+              style={{
+                lineColor: '#09d1a0',
+                lineWidth: 3,
+                lineOpacity: 0.7,
+              }}
+            />
+          </ShapeSource>
+        )}
+      </MapView>
+
+      {/* Search Bar - Au dessus de la carte */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -272,116 +367,10 @@ const HospitalListScreen = ({ navigation }) => {
         <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
       </View>
 
-      {/* Map Container */}
-      <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          styleURL={'mapbox://styles/mapbox/streets-v11'}
-          rotateEnabled={false}
-          pitchEnabled={false}
-          logoEnabled={false}
-          attributionEnabled={false}
-        >
-          <Camera
-            ref={cameraRef}
-            zoomLevel={15}
-            centerCoordinate={userLocation ? [userLocation.longitude, userLocation.latitude] : [0, 0]}
-          />
-          
-          {/* User Location Marker */}
-          {userLocation && (
-            <MarkerView coordinate={[userLocation.longitude, userLocation.latitude]}>
-              <View style={styles.userMarker}>
-                <View style={styles.userMarkerInner} />
-              </View>
-            </MarkerView>
-          )}
-          
-          {/* Hospitals Markers */}
-          {sortedHospitals.map((hospital, index) => (
-            hospital.location && (
-              <MarkerView
-                key={hospital.id}
-                coordinate={[hospital.location.longitude, hospital.location.latitude]}
-                anchor={{ x: 0.5, y: 0.5 }}
-              >
-                <Pressable onPress={() => {
-                  setCurrentHospitalIndex(index);
-                  navigation.navigate('HospitalDetails', { hospital });
-                }}>
-                  <View style={[
-                    styles.hospitalMarker,
-                    index === currentHospitalIndex && styles.selectedHospitalMarker
-                  ]}>
-                    <Icon name="medical" size={16} color="white" />
-                  </View>
-                </Pressable>
-                
-                {/* Hospital Name Label */}
-                <SymbolLayer
-                  id={`hospital-label-${hospital.id}`}
-                  style={{
-                    textField: hospital.name,
-                    textSize: 12,
-                    textColor: '#09d1a0',
-                    textHaloColor: 'white',
-                    textHaloWidth: 1,
-                    textOffset: [0, 1.5],
-                    textAnchor: 'top'
-                  }}
-                />
-              </MarkerView>
-            )
-          ))}
-          
-          {/* Route Layer */}
-          {route && (
-            <ShapeSource id="routeSource" shape={route}>
-              <LineLayer
-                id="routeLayer"
-                style={{
-                  lineColor: '#09d1a0',
-                  lineWidth: 3,
-                  lineOpacity: 0.7
-                }}
-              />
-            </ShapeSource>
-          )}
-        </MapView>
-        
-        {/* Map Controls */}
-        <Pressable
-          style={[styles.mapButton, styles.targetButton]}
-          onPress={centerOnUser}
-        >
-          <Icon name="locate" size={20} color="#09d1a0" />
-        </Pressable>
-
-        <Pressable
-          style={[styles.mapButton, styles.nextButton]}
-          onPress={goToNextHospital}
-        >
-          <Icon name="arrow-forward" size={20} color="#09d1a0" />
-        </Pressable>
-
-        {distanceText && (
-          <View style={styles.distanceBadge}>
-            <Text style={styles.distanceText}>{distanceText}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Hospitals List */}
-      <FlatList
-        data={sortedHospitals}
-        renderItem={renderHospitalItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Aucun hôpital trouvé</Text>
-        }
-      />
+      {/* Map Controls */}
+      <Pressable style={[styles.mapButton, styles.targetButton]} onPress={centerOnUser}>
+        <Icon name="locate" size={20} color="#09d1a0" />
+      </Pressable>
 
       {/* Floating Action Button for Consultation History */}
       <Pressable
@@ -395,10 +384,128 @@ const HospitalListScreen = ({ navigation }) => {
           </View>
         )}
       </Pressable>
+
+      {/* Backdrop */}
+      {selectedHospital && (
+        <Animated.View
+          style={[
+            styles.backdrop,
+            {
+              opacity: backdropAnim,
+            },
+          ]}
+        >
+          <Pressable style={styles.backdropPress} onPress={hideBottomSheet} />
+        </Animated.View>
+      )}
+
+      {/* Bottom Sheet */}
+      {selectedHospital && (
+        <Animated.View
+          style={[
+            styles.bottomSheet,
+            {
+              transform: [{ translateY: bottomSheetAnim }],
+            },
+          ]}
+          {...panResponder.panHandlers}
+        >
+          {/* Handle */}
+          <View style={styles.bottomSheetHandle} />
+
+          {/* Hospital Content */}
+          <View style={styles.bottomSheetContent}>
+            {/* Hospital Header */}
+            <View style={styles.hospitalHeader}>
+              {selectedHospital.logo ? (
+                <Image source={{ uri: selectedHospital.logo }} style={styles.hospitalLogo} />
+              ) : (
+                <View style={styles.hospitalLogoPlaceholder}>
+                  <Icon name="medical" size={32} color="#fff" />
+                </View>
+              )}
+              
+              <View style={styles.hospitalInfo}>
+                <Text style={styles.hospitalName}>
+                  {selectedHospital.name || 'Nom inconnu'}
+                </Text>
+                <Text style={styles.hospitalAddress}>
+                  <Icon name="location" size={14} color="#666" /> 
+                  {selectedHospital.address || 'Adresse inconnue'}
+                </Text>
+                {distanceText && (
+                  <Text style={styles.hospitalDistance}>
+                    <Icon name="walk" size={14} color="#09d1a0" /> {distanceText}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Hospital Details */}
+            <View style={styles.hospitalDetails}>
+              <Text style={styles.sectionTitle}>Informations</Text>
+
+              {/* Téléphone */}
+              {selectedHospital.phone && (
+                <View style={styles.infoRow}>
+                  <Icon name="call" size={16} color="#666" />
+                  <Text style={styles.infoText}>{selectedHospital.phone}</Text>
+                </View>
+              )}
+
+              {/* Email */}
+              {selectedHospital.email && (
+                <View style={styles.infoRow}>
+                  <Icon name="mail" size={16} color="#666" />
+                  <Text style={styles.infoText}>{selectedHospital.email}</Text>
+                </View>
+              )}
+
+              {/* Spécialités */}
+              {selectedHospital.specialties && selectedHospital.specialties.length > 0 && (
+                <View style={styles.infoRow}>
+                  <Icon name="medical" size={16} color="#666" />
+                  <Text style={styles.infoText}>
+                    {selectedHospital.specialties.join(', ')}
+                  </Text>
+                </View>
+              )}
+
+              {/* Horaires d'ouverture */}
+              {selectedHospital.openingHours && (
+                <View style={styles.openingHoursContainer}>
+                  <Text style={styles.sectionTitle}>Horaires d'ouverture</Text>
+                  <View style={styles.openingHoursScrollContainer}>
+                    <ScrollView>
+                      {Object.entries(selectedHospital.openingHours).map(([day, hours]) => (
+                        <Text key={day} style={styles.openingHoursText}>
+                          {`${day.charAt(0).toUpperCase() + day.slice(1)} : `}
+                          {hours.closed ? 'Fermé' : `${hours.open} - ${hours.close}`}
+                        </Text>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Action Button */}
+            <Pressable
+              style={styles.appointmentButton}
+              onPress={() => {
+                hideBottomSheet();
+                navigation.navigate('PrendreRendezVous', { hospital: selectedHospital });
+              }}
+            >
+              <Icon name="calendar" size={20} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.appointmentButtonText}>Prendre Rendez-vous</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -410,55 +517,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  map: {
+    flex: 1,
+  },
   searchContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 15,
+    right: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginTop:30
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 1000,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginRight: 10,
+    fontSize: 16,
+    color: '#333',
+    fontFamily: 'UbuntuMono-Bold',
   },
   searchIcon: {
-    marginRight: 10,
-  },
-  specialtiesContainer: {
-    paddingVertical: 10,
-    paddingLeft: 15,
-    backgroundColor: '#fff',
-  },
-  specialtyButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f5f5f5',
-    marginRight: 10,
-  },
-  selectedSpecialtyButton: {
-    backgroundColor: '#09d1a0',
-  },
-  specialtyText: {
-    color: '#666',
-  },
-  selectedSpecialtyText: {
-    color: '#fff',
-  },
-  mapContainer: {
-    height: 200,
-    margin: 15,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  map: {
-    flex: 1,
+    marginLeft: 10,
   },
   userMarker: {
     width: 20,
@@ -477,219 +564,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#09d1a0',
   },
   hospitalMarker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
     backgroundColor: '#09d1a0',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   },
-  hospitalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  hospitalLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-  },
-  hospitalInfo: {
-    flex: 1,
-  },
-  hospitalName: {
-    fontSize: 16,
-    marginBottom: 5,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  hospitalText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 5,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  distanceText: {
-    fontSize: 14,
-    color: '#09d1a0',
-    marginLeft: 5,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: '#666',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  // Styles pour HospitalDetailScreen
-  backButton: {
-    padding: 15,
-  },
-  hospitalHeader: {
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  hospitalDetailLogo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 15,
-  },
-  hospitalDetailName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  hospitalAddress: {
-    fontSize: 14,
-    color: '#666',
-    marginVertical:5,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  section: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  hoursRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  dayLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  hoursText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  closedText: {
-    fontSize: 16,
-    color: '#e74c3c',
-    fontStyle: 'italic',
-  },
-  noHoursText: {
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  selectedDateText: {
-    fontSize: 16,
-    color: '#09d1a0',
-    fontWeight: '500',
-    padding: 10,
-    backgroundColor: '#f0f9f7',
-    borderRadius: 8,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  timeSlot: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-  },
-  selectedTimeSlot: {
-    backgroundColor: '#09d1a0',
-  },
-  timeSlotText: {
-    fontSize: 14,
-    color: '#333',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  timeSlotsContainer: {
-    paddingVertical: 10,
-  },
-  noSlotsText: {
-    color: '#666',
-    fontStyle: 'italic',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  bookButton: {
-    margin: 20,
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#09d1a0',
-    alignItems: 'center',
-  },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  modalText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: '#eee',
-    marginRight: 10,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  confirmButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: '#09d1a0',
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontFamily: 'UbuntuMono-Bold',
+  selectedHospitalMarker: {
+    backgroundColor: '#ff6b6b',
+    transform: [{ scale: 1.2 }],
   },
   mapButton: {
     position: 'absolute',
     backgroundColor: '#fff',
     borderRadius: 30,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -699,33 +597,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   targetButton: {
-    bottom: 20,
-    right: 20,
-  },
-  hospitalsButton: {
-    bottom: 70,
-    right: 20,
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-  nextButton: {
-    bottom: 70,
-    right: 20,
-  },
-  distanceBadge: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    elevation: 3,
+    bottom: 30,
+    right: 30,
   },
   fab: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 100,
     right: 30,
     backgroundColor: '#09d1a0',
     width: 60,
@@ -734,7 +611,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
-    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   fabBadge: {
     position: 'absolute',
@@ -753,180 +633,154 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 12,
   },
-  selectedHospitalMarker: {
-    backgroundColor: '#ff6b6b',
-    transform: [{ scale: 1.2 }],
-    zIndex: 10,
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+    zIndex: 1000,
   },
-  selectedHospitalCard: {
-    backgroundColor: '#f0f9f7',
-  },
-  hospitalLogoPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-    backgroundColor: '#09d1a0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hospitalDistance: {
-    fontSize: 12,
-    color: '#09d1a0',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
-  },
-  address: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  doctorCard: {
-    width: 120,
-    marginRight: 12,
-    alignItems: 'center',
-  },
-  doctorImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 8,
-  },
-  doctorName: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  specialty: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  modalOverlay: {
+  backdropPress: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  appointmentDetails: {
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: BOTTOM_SHEET_HEIGHT,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    zIndex: 1001,
+  },
+  bottomSheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#ddd',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
     marginBottom: 20,
   },
-  detailText: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#333',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  modalButton: {
+  bottomSheetContent: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  hospitalHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  doctorsScroll: {
+    marginBottom: 20,
+    paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  doctorsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  hospitalLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
   },
-  doctorFilterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginRight: 8,
-  },
-  selectedDoctorFilter: {
+  hospitalLogoPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#09d1a0',
-    borderColor: '#09d1a0',
-  },
-  doctorFilterText: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  selectedDoctorFilterText: {
-    color: '#fff',
-    fontFamily: 'UbuntuMono-Bold',
-  },
-  calendarContainer: {
-    backgroundColor: '#fff',
-    margin: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  slotsContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  noSlotsContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    marginRight: 15,
   },
-  doctorSlotContainer: {
-    marginBottom: 24,
+  hospitalInfo: {
+    flex: 1,
   },
-  doctorHeader: {
+  hospitalName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+    fontFamily: 'UbuntuMono-Bold',
+  },
+  hospitalAddress: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    fontFamily: 'UbuntuMono-Bold',
+  },
+  hospitalDistance: {
+    fontSize: 14,
+    color: '#09d1a0',
+    fontWeight: '500',
+    fontFamily: 'UbuntuMono-Bold',
+  },
+  hospitalDetails: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    fontFamily: 'UbuntuMono-Bold',
+  },
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  doctorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  doctorAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#09d1a0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  doctorSpecialty: {
+  infoText: {
     fontSize: 14,
     color: '#666',
+    marginLeft: 10,
+    flex: 1,
+    fontFamily: 'UbuntuMono-Bold',
   },
-  timeSlotsGrid: {
+  openingHoursContainer: {
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  openingHoursScrollContainer: {
+    maxHeight: 120,
+  },
+  openingHoursText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 8,
+    fontFamily: 'UbuntuMono-Bold',
+  },
+  appointmentButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#09d1a0',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    marginTop: 10,
+  },
+  buttonIcon: {
+    marginRight: 10,
+  },
+  appointmentButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'UbuntuMono-Bold',
   },
 });
 
