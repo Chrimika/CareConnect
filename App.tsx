@@ -25,10 +25,16 @@ import AddHospitalScreen from './screens/AddHospital'
 import AddMedecinScreen from './screens/AddMedecins';
 import MedecinScreen from './screens/MedecinScreen';
 import { HospitalListScreen } from './screens/Consultations';
-import ChatScreen from './screens/Chat';
+import ChatScreen from './screens/ChatPatient';
 import HistoriqueConsultationsScreen from './screens/HistoriqueConsultations';
 import ConsultationDetailScreen from './screens/ConsultationDetail';
 import PrendreRendezVousScreen from './screens/PrendreRendezVous';
+import MedecinRendezVousScreen from './screens/MedecinRendezVous'; // à créer
+import MedecinNotificationsScreen from './screens/MedecinNotifications'; // à créer
+import MedecinProfileScreen from './screens/MedecinProfile'; // à créer
+import EditMedecinScreen from './screens/EditMedecin'; // nouvel écran
+import EditHospitalScreen from './screens/EditHospital';
+import HospitalDetailsScreen from './screens/HopitalDetails';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -72,7 +78,7 @@ const App = () => {
       checkUserRole();
     }, []);
 
-    if (userRole == 'admin') {
+    if (userRole === 'admin') {
       return (
         <Tab.Navigator
           screenOptions={({ route }) => ({
@@ -142,6 +148,75 @@ const App = () => {
             name="Profil" 
             component={ProfileScreen} 
             options={{ headerShown: false }} 
+          />
+        </Tab.Navigator>
+      );
+    }
+
+    if (userRole === 'medecin') {
+      // Onglets pour les médecins
+      return (
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
+            animation: "fade",
+            tabBarIcon: ({ color }) => {
+              let iconName;
+              if (route.name === 'RendezVous') iconName = 'calendar';
+              else if (route.name === 'Messages') iconName = 'mail';
+              else if (route.name === 'Notifications') iconName = 'bell';
+              else if (route.name === 'Profil') iconName = 'user';
+              return (
+                <View style={styles.iconContainer}>
+                  <Feather name={iconName} size={20} color={color} />
+                </View>
+              );
+            },
+            tabBarActiveTintColor: '#09d1a0',
+            tabBarInactiveTintColor: '#6e6e6e',
+            tabBarHideOnKeyboard: true,
+            tabBarStyle: { 
+              backgroundColor: '#fff', 
+              borderTopWidth: 0,
+              elevation: 10,
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              height: 60,
+              paddingBottom: 5
+            },
+            tabBarLabelStyle: {
+              fontSize: 12,
+              marginBottom: 5
+            },
+            tabBarButton: (props) => (
+              <TouchableWithoutFeedback
+                onPress={props.onPress}
+                accessibilityRole="button"
+                accessible
+              >
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>{props.children}</View>
+              </TouchableWithoutFeedback>
+            ),
+          })}
+        >
+          <Tab.Screen
+            name="RendezVous"
+            component={MedecinRendezVousScreen} // à créer
+            options={{ headerShown: false, title: 'Rendez-vous' }}
+          />
+          <Tab.Screen
+            name="Messages"
+            component={MessagesScreen}
+            options={{ headerShown: false, title: 'Messages' }}
+          />
+          <Tab.Screen
+            name="Notifications"
+            component={MedecinNotificationsScreen} // à créer
+            options={{ headerShown: false, title: 'Notifications' }}
+          />
+          <Tab.Screen
+            name="Profil"
+            component={MedecinProfileScreen} // à créer
+            options={{ headerShown: false, title: 'Profil' }}
           />
         </Tab.Navigator>
       );
@@ -283,7 +358,7 @@ const App = () => {
         />
         <Stack.Screen 
           name="HospitalDetails" 
-          component={ConsultationsScreen} 
+          component={HospitalDetailsScreen} 
           options={{ headerShown: false }} 
         />
         <Stack.Screen 
@@ -310,6 +385,16 @@ const App = () => {
           name="PrendreRendezVous" 
           component={PrendreRendezVousScreen} 
           options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="EditMedecin" 
+          component={EditMedecinScreen} 
+          options={{ title: 'Modifier Médecin' }} 
+        />
+        <Stack.Screen 
+          name="EditHospital" 
+          component={EditHospitalScreen} 
+          options={{ title: 'Modifier Médecin' }} 
         />
         
       </Stack.Navigator>

@@ -299,6 +299,7 @@ const HospitalListScreen = ({ navigation }) => {
         pitchEnabled={false}
         logoEnabled={false}
         attributionEnabled={false}
+        scaleBarEnabled={false}
       >
         <Camera
           ref={cameraRef}

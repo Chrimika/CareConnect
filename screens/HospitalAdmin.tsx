@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Pressable, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import firestore from '@react-native-firebase/firestore';
@@ -63,6 +63,33 @@ export default function HospitalAdminScreen({ navigation }) {
     return () => unsubscribe();
   }, []);
 
+  // Suppression d'un hôpital avec confirmation
+  const handleDeleteHospital = (hospitalId, hospitalName) => {
+    Alert.alert(
+      "Confirmation",
+      `Voulez-vous vraiment supprimer l'hôpital "${hospitalName}" ?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await firestore().collection('hospitals').doc(hospitalId).delete();
+              setHospitals(prev => prev.filter(h => h.id !== hospitalId));
+              Alert.alert("Succès", "Hôpital supprimé !");
+            } catch (error) {
+              Alert.alert("Erreur", "Impossible de supprimer cet hôpital");
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderHospitalItem = ({ item }) => (
     <Pressable 
       style={styles.hospitalCard}
@@ -86,15 +113,19 @@ export default function HospitalAdminScreen({ navigation }) {
         )}
       </View>
       <View style={{display:'flex',flexDirection:'row',marginTop:'auto'}}>
-        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',borderRadius:'50%'}}>
-           <Icon name="create-outline" size={20} color="#09d1a0"  />
+        <Pressable
+          style={{padding:5,backgroundColor:'#f9f9f9',borderRadius:50}}
+          onPress={() => navigation.navigate('EditHospital', { hospital: item })}
+        >
+          <Icon name="create-outline" size={20} color="#09d1a0"  />
         </Pressable>
-        <Pressable style={{padding:5,backgroundColor:'#f9f9f9',marginLeft:15,borderRadius:'50%'}}>
+        <Pressable
+          style={{padding:5,backgroundColor:'#f9f9f9',marginLeft:15,borderRadius:50}}
+          onPress={() => handleDeleteHospital(item.id, item.name)}
+        >
           <Icon name="trash" size={20} color="red"/>
         </Pressable>
-        
       </View>
-     
     </Pressable>
   );
 

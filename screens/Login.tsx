@@ -33,8 +33,14 @@ export default function LoginScreen({ navigation }) {
 
   const fetchUserData = async (uid) => {
     try {
-      const doc = await firestore().collection('users').doc(uid).get();
-      
+      // On tente d'abord dans 'users'
+      let doc = await firestore().collection('users').doc(uid).get();
+
+      // Si pas trouvé, on tente dans 'medecins'
+      if (!doc.exists) {
+        doc = await firestore().collection('medecins').doc(uid).get();
+      }
+
       if (doc.exists) {
         const userData = {
           uid,
@@ -46,6 +52,8 @@ export default function LoginScreen({ navigation }) {
         // Vérification du rôle et redirection appropriée
         if (userData.role === 'admin') {
           navigation.replace('AdminDashboard');
+        } else if (userData.role === 'medecin') {
+          navigation.replace('MedecinTabs'); // ou le nom de ton navigator/tab pour médecins
         } else {
           navigation.replace('Home');
         }
